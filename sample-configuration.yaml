@@ -1,16 +1,7 @@
 dependencies:
-  - name: Home Prometheus
-    http_endpoint: https://monitor.home.bencl.app/prometheus/-/healthy
+  - name: Google
+    http_endpoint: https://google.com
     type: http
-  - name: MX West Prometheus
-    http_endpoint: https://monitor-prod-westus2.movi.exchange/prometheus/-/healthy
-    type: http
-  - name: MX East Prometheus
-    http_endpoint: https://monitor-prod-eastus2.movi.exchange/prometheus/-/healthy
-    type: http
-  - name: Home Alertmanager
-    http_endpoint: https://monitor.home.bencl.app/alertmanager/-/healthy
-    type: http
-  - name: '404'
-    http_endpoint: https://monitor.home.bencl.app/404/health
+  - name: Demo Prometheus
+    http_endpoint: http://demo.robustperception.io:9090/-/healthy
     type: http
