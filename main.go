@@ -94,6 +94,8 @@ func handleHealth(w http.ResponseWriter, r *http.Request) {
 	for range config.Dependencies {
 		<-ch
 	}
+
+	w.WriteHeader(http.StatusBadGateway)
 }
 
 func checkHealth(e, n string, ch chan<- result) {
