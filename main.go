@@ -1,4 +1,4 @@
-package updog
+package main
 
 import (
 	"encoding/json"
@@ -53,15 +53,19 @@ func init() {
 
 	config.getConf()
 
-	fmt.Println("Dependencies:")
-	for _, dep := range config.Dependencies {
-		println(dep.Name, ":", dep.HTTPEndpoint)
-	}
-
 	prometheus.MustRegister(httpDurationsHistogram)
+
 	prometheus.MustRegister(healthCheckDependencyDuration)
 	prometheus.MustRegister(healthChecksTotal)
 	prometheus.MustRegister(healthChecksFailuresTotal)
+
+	fmt.Println("Dependencies:")
+	for _, dep := range config.Dependencies {
+		println(dep.Name, ":", dep.HTTPEndpoint)
+		healthCheckDependencyDuration.WithLabelValues(dep.Name).Observe(0)
+		healthChecksTotal.WithLabelValues(dep.Name).Add(0)
+		healthChecksFailuresTotal.WithLabelValues(dep.Name).Add(0)
+	}
 }
 
 func main() {
