@@ -54,7 +54,6 @@ func init() {
 	config.getConf()
 
 	prometheus.MustRegister(httpDurationsHistogram)
-
 	prometheus.MustRegister(healthCheckDependencyDuration)
 	prometheus.MustRegister(healthChecksTotal)
 	prometheus.MustRegister(healthChecksFailuresTotal)
@@ -84,37 +83,34 @@ func handlePing(w http.ResponseWriter, r *http.Request) {
 
 func handleHealth(w http.ResponseWriter, r *http.Request) {
 	//declare status and duration channels. Perhaps a channel as a struct?
-	ch := make(chan result)
+	ch := make(chan Result)
 
 	for _, dep := range config.Dependencies {
-		go checkHealth(dep.HTTPEndpoint, dep.Name, ch)
+		go checkHealth(dep.HTTPEndpoint, dep.Name, dep.Type, ch)
 	}
 
-	var results = resultCollection{}
+	var results = resultResponse{}
 	for range config.Dependencies {
 		res := <-ch
 		fmt.Println("Returned result:", res)
 
-		results.res = append(results.res, res)
-		if res.success == false {
+		results.Result = append(results.Result, res)
+		if res.Success == false {
 			w.WriteHeader(http.StatusBadGateway)
 		}
 	}
 	fmt.Println("Returned results:", results)
 
-	respBody, err := json.Marshal(results)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	fmt.Println("Json marshaled results:", respBody)
-	fmt.Fprintf(w, string(respBody))
+	re := &results
+	response, _ := json.MarshalIndent(re, "", "    ")
+
+	fmt.Fprintf(w, string(response))
 
 }
 
-func checkHealth(e, n string, ch chan<- result) {
+func checkHealth(e, n, t string, ch chan<- Result) {
 	start := time.Now()
-	fmt.Println("Starting dep check for", n, "at", start.UnixNano())
+	// fmt.Println("Starting dep check for", n, "at", start.UnixNano())
 
 	//hit endpoint
 	resp, err := http.Get(e)
@@ -124,29 +120,37 @@ func checkHealth(e, n string, ch chan<- result) {
 
 	//stop timing
 	elapsed := float64(time.Since(start).Seconds())
-	fmt.Println("Ending dep check for", n, "after", elapsed)
+	// fmt.Println("Ending dep check for", n, "after", elapsed)
 
 	healthCheckDependencyDuration.WithLabelValues(n).Observe(elapsed)
 	healthChecksTotal.WithLabelValues(n).Inc()
 
 	//check response code
 	if resp.StatusCode >= 200 && resp.StatusCode <= 299 {
-		ch <- result{success: true, duration: elapsed}
+		ch <- Result{Name: n, Type: t, Success: true, Duration: elapsed}
 	} else {
 		healthChecksFailuresTotal.WithLabelValues(n).Inc()
 		fmt.Println("Check failed for", n, "response code: ", resp.Status)
-		ch <- result{success: false, duration: elapsed, httpStatus: resp.Status}
+		ch <- Result{Name: n, Type: t, Success: false, Duration: elapsed, HTTPStatus: resp.Status}
 	}
 }
 
-type resultCollection struct {
-	res []result `json:"results"`
+type resultResponse struct {
+	Result []struct {
+		Name       string  `json:"name"`
+		Type       string  `json:"type"`
+		Success    bool    `json:"success"`
+		Duration   float64 `json:"duration"`
+		HTTPStatus string  `json:"httpStatus,omitempty"`
+	} `json:"results"`
 }
 
-type result struct {
-	success    bool    `json:"success"`
-	duration   float64 `json:"duration"`
-	httpStatus string  `json:"httpStatus"`
+type Result struct {
+	Name       string  `json:"name"`
+	Type       string  `json:"type"`
+	Success    bool    `json:"success"`
+	Duration   float64 `json:"duration"`
+	HTTPStatus string  `json:"httpStatus,omitempty"`
 }
 
 type conf struct {
