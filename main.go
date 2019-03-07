@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -78,12 +79,6 @@ func handlePing(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleHealth(w http.ResponseWriter, r *http.Request) {
-	resp, err := http.Get("https://monitor.home.bencl.app/alertmanager/-/healthy")
-	if err != nil {
-		log.Fatal(err)
-	}
-	fmt.Println("HTTP Response Status:", resp.Status)
-
 	//declare status and duration channels. Perhaps a channel as a struct?
 	ch := make(chan result)
 
@@ -91,11 +86,26 @@ func handleHealth(w http.ResponseWriter, r *http.Request) {
 		go checkHealth(dep.HTTPEndpoint, dep.Name, ch)
 	}
 
+	var results = resultCollection{}
 	for range config.Dependencies {
-		<-ch
-	}
+		res := <-ch
+		fmt.Println("Returned result:", res)
 
-	w.WriteHeader(http.StatusBadGateway)
+		results.res = append(results.res, res)
+		if res.success == false {
+			w.WriteHeader(http.StatusBadGateway)
+		}
+	}
+	fmt.Println("Returned results:", results)
+
+	respBody, err := json.Marshal(results)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	fmt.Println("Json marshaled results:", respBody)
+	fmt.Fprintf(w, string(respBody))
+
 }
 
 func checkHealth(e, n string, ch chan<- result) {
@@ -120,13 +130,19 @@ func checkHealth(e, n string, ch chan<- result) {
 		ch <- result{success: true, duration: elapsed}
 	} else {
 		healthChecksFailuresTotal.WithLabelValues(n).Inc()
-		ch <- result{success: false, duration: elapsed}
+		fmt.Println("Check failed for", n, "response code: ", resp.Status)
+		ch <- result{success: false, duration: elapsed, httpStatus: resp.Status}
 	}
 }
 
+type resultCollection struct {
+	res []result `json:"results"`
+}
+
 type result struct {
-	success  bool
-	duration float64
+	success    bool    `json:"success"`
+	duration   float64 `json:"duration"`
+	httpStatus string  `json:"httpStatus"`
 }
 
 type conf struct {
