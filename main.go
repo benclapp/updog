@@ -5,6 +5,8 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
+	"os"
+
 	"log"
 	"net/http"
 	"time"
@@ -12,7 +14,11 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	yaml "gopkg.in/yaml.v2"
+
+	logg "github.com/go-kit/kit/log"
 )
+
+var logger logg.Logger
 
 var config = conf{}
 
@@ -51,6 +57,10 @@ var (
 
 func init() {
 
+	logger = logg.NewLogfmtLogger(logg.NewSyncWriter(os.Stderr))
+	logger = logg.With(logger, "ts", logg.DefaultTimestampUTC, "caller", logg.DefaultCaller)
+
+	logger.Log("msg", "Loading config")
 	config.getConf()
 
 	prometheus.MustRegister(httpDurationsHistogram)
@@ -58,9 +68,10 @@ func init() {
 	prometheus.MustRegister(healthChecksTotal)
 	prometheus.MustRegister(healthChecksFailuresTotal)
 
-	fmt.Println("Dependencies:")
+	logger.Log("msg", "Dependencies:")
 	for _, dep := range config.Dependencies {
-		println(dep.Name, ":", dep.HTTPEndpoint)
+		logger.Log("dependency_name", dep.Name, "dependency_type", dep.Type, "dependency_endpoint", dep.HTTPEndpoint)
+
 		healthCheckDependencyDuration.WithLabelValues(dep.Name).Observe(0)
 		healthChecksTotal.WithLabelValues(dep.Name).Add(0)
 		healthChecksFailuresTotal.WithLabelValues(dep.Name).Add(0)
@@ -92,14 +103,12 @@ func handleHealth(w http.ResponseWriter, r *http.Request) {
 	var results = resultResponse{}
 	for range config.Dependencies {
 		res := <-ch
-		fmt.Println("Returned result:", res)
 
 		results.Result = append(results.Result, res)
 		if res.Success == false {
 			w.WriteHeader(http.StatusBadGateway)
 		}
 	}
-	fmt.Println("Returned results:", results)
 
 	re := &results
 	response, _ := json.MarshalIndent(re, "", "    ")
@@ -110,17 +119,22 @@ func handleHealth(w http.ResponseWriter, r *http.Request) {
 
 func checkHealth(e, n, t string, ch chan<- Result) {
 	start := time.Now()
-	// fmt.Println("Starting dep check for", n, "at", start.UnixNano())
+	// logger.Log("msg", "Starting dep check for", n, "at", start.UnixNano())
+
+	timeout := time.Duration(9500 * time.Millisecond)
+	client := http.Client{
+		Timeout: timeout,
+	}
 
 	//hit endpoint
-	resp, err := http.Get(e)
+	resp, err := client.Get(e)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	//stop timing
 	elapsed := float64(time.Since(start).Seconds())
-	// fmt.Println("Ending dep check for", n, "after", elapsed)
+	// logger.Log("msg", "Ending dep check for", n, "after", elapsed)
 
 	healthCheckDependencyDuration.WithLabelValues(n).Observe(elapsed)
 	healthChecksTotal.WithLabelValues(n).Inc()
@@ -130,7 +144,7 @@ func checkHealth(e, n, t string, ch chan<- Result) {
 		ch <- Result{Name: n, Type: t, Success: true, Duration: elapsed}
 	} else {
 		healthChecksFailuresTotal.WithLabelValues(n).Inc()
-		fmt.Println("Check failed for", n, "response code: ", resp.Status)
+		logger.Log("msg", "health check dependency failed", "dependency_name", n, "response_code", resp.Status, "duration", elapsed)
 		ch <- Result{Name: n, Type: t, Success: false, Duration: elapsed, HTTPStatus: resp.Status}
 	}
 }
