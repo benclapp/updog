@@ -101,13 +101,18 @@ func handleHealth(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var results = resultResponse{}
+	var pass = true
 	for range config.Dependencies {
 		res := <-ch
 
 		results.Result = append(results.Result, res)
 		if res.Success == false {
-			w.WriteHeader(http.StatusBadGateway)
+			pass = false
 		}
+	}
+
+	if pass == false {
+		w.WriteHeader(http.StatusBadGateway)
 	}
 
 	re := &results
@@ -128,16 +133,19 @@ func checkHealth(e, n, t string, ch chan<- Result) {
 
 	//hit endpoint
 	resp, err := client.Get(e)
-	if err != nil {
-		log.Fatal(err)
-	}
 
 	//stop timing
 	elapsed := float64(time.Since(start).Seconds())
-	// logger.Log("msg", "Ending dep check for", n, "after", elapsed)
 
 	healthCheckDependencyDuration.WithLabelValues(n).Observe(elapsed)
 	healthChecksTotal.WithLabelValues(n).Inc()
+
+	if err != nil {
+		logger.Log("msg", "Error while checking dependency", "err", err)
+		healthChecksFailuresTotal.WithLabelValues(n).Inc()
+		ch <- Result{Name: n, Type: t, Success: false, Duration: elapsed}
+		return
+	}
 
 	//check response code
 	if resp.StatusCode >= 200 && resp.StatusCode <= 299 {
