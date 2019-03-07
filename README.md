@@ -1,4 +1,4 @@
-# whats_up
+# updog
 
 ## To Do
 
@@ -11,6 +11,5 @@
     - database
     - redis
 - return json object with dependency duration and success state
-- rename project to updog
 - create dockerfile
 - configurable root path

@@ -1,4 +1,4 @@
-package main
+package updog
 
 import (
 	"encoding/json"
