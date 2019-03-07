@@ -2,7 +2,6 @@
 
 ## To Do
 
-1. http metrics for inbound requests
 1. configuration
     - config path
     - root http path

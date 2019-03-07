@@ -25,10 +25,13 @@ var config = conf{}
 var addr = flag.String("listen-address", ":8080", "The address to listen on for HTTP requests.")
 
 var (
-	httpDurationsHistogram = prometheus.NewHistogram(prometheus.HistogramOpts{
-		Name: "http_request_duration_seconds",
-		Help: "HTTP Latency histogram",
-	})
+	httpDurationsHistogram = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name: "http_request_duration_seconds",
+			Help: "HTTP Latency histogram",
+		},
+		[]string{"handler"},
+	)
 
 	healthCheckDependencyDuration = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
@@ -63,10 +66,12 @@ func init() {
 	logger.Log("msg", "Loading config")
 	config.getConf()
 
-	prometheus.MustRegister(httpDurationsHistogram)
-	prometheus.MustRegister(healthCheckDependencyDuration)
-	prometheus.MustRegister(healthChecksTotal)
-	prometheus.MustRegister(healthChecksFailuresTotal)
+	prometheus.MustRegister(
+		httpDurationsHistogram,
+		healthCheckDependencyDuration,
+		healthChecksTotal,
+		healthChecksFailuresTotal,
+	)
 
 	logger.Log("msg", "Dependencies:")
 	for _, dep := range config.Dependencies {
@@ -89,11 +94,13 @@ func main() {
 }
 
 func handlePing(w http.ResponseWriter, r *http.Request) {
+	start := time.Now()
 	fmt.Fprintf(w, "pong")
+	httpDurationsHistogram.WithLabelValues("ping").Observe(time.Since(start).Seconds())
 }
 
 func handleHealth(w http.ResponseWriter, r *http.Request) {
-	//declare status and duration channels. Perhaps a channel as a struct?
+	start := time.Now()
 	ch := make(chan Result)
 
 	for _, dep := range config.Dependencies {
@@ -120,6 +127,7 @@ func handleHealth(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Fprintf(w, string(response))
 
+	httpDurationsHistogram.WithLabelValues("health").Observe(time.Since(start).Seconds())
 }
 
 func checkHealth(e, n, t string, ch chan<- Result) {
