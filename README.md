@@ -2,14 +2,14 @@
 
 ## To Do
 
-- Timeout for dependency requests
-- tidy logs, use nice log formatting
-- write readme
-- loadtest
-- http metrics for inbound requests
-- check for non http dependencies
+1. return json object with dependency duration and success state
+1. Timeout for dependency requests
+1. tidy logs, use nice log formatting
+1. http metrics for inbound requests
+1. create dockerfile
+1. configurable root path
+1. write readme
+1. loadtest
+1. check for non http dependencies
     - database
     - redis
-- return json object with dependency duration and success state
-- create dockerfile
-- configurable root path
