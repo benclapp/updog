@@ -3,7 +3,7 @@
 ## To Do
 
 - Timeout for dependency requests
-- tidy logs
+- tidy logs, use nice log formatting
 - write readme
 - loadtest
 - http metrics for inbound requests
