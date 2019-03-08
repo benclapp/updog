@@ -24,7 +24,7 @@ var config = conf{}
 
 var (
 	timeout       = kingpin.Flag("timeout", "Timeout for dependency checks").Short('t').Default("5s").Duration()
-	configPath    = kingpin.Flag("config.path", "Path of configuration file").Short('c').Default("updog.yaml").String()
+	configPath    = kingpin.Flag("config.path", "Path of configuration file").Short('c').Default("config/updog.yaml").String()
 	listenAddress = kingpin.Flag("listen.address", "Address to listen on for HTTP requests").Default(":1111").String()
 )
 
