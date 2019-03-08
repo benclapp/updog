@@ -2,6 +2,9 @@ dependencies:
   - name: Google
     http_endpoint: https://google.com
     type: http
-  - name: Demo Prometheus
+  - name: GitHub
+    http_endpoint: https://github.com
+    type: http
+  - name: Prometheus
     http_endpoint: http://demo.robustperception.io:9090/-/healthy
     type: http

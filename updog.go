@@ -36,15 +36,15 @@ var (
 var (
 	httpDurationsHistogram = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
-			Name: "http_request_duration_seconds",
+			Name: "updog_http_request_duration_seconds",
 			Help: "HTTP Latency histogram",
 		},
-		[]string{"handler"},
+		[]string{"path"},
 	)
 
 	healthCheckDependencyDuration = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
-			Name: "updog_health_check_dependency_duration_seconds",
+			Name: "updog_dependency_duration_seconds",
 			Help: "Duration of a health check dependency in seconds",
 		},
 		[]string{"depenency"},
@@ -52,7 +52,7 @@ var (
 
 	healthChecksTotal = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "updog_dependency_health_checks_total",
+			Name: "updog_dependency_checks_total",
 			Help: "Count of total health checks per dependency",
 		},
 		[]string{"dependency"},
@@ -60,7 +60,7 @@ var (
 
 	healthChecksFailuresTotal = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "updog_dependency_health_check_failures_total",
+			Name: "updog_dependency_check_failures_total",
 			Help: "Count of total health check failures per dependency",
 		},
 		[]string{"dependency"},
@@ -120,7 +120,7 @@ func main() {
 func handlePing(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
 	fmt.Fprintf(w, "pong")
-	httpDurationsHistogram.WithLabelValues("ping").Observe(time.Since(start).Seconds())
+	httpDurationsHistogram.WithLabelValues("/ping").Observe(time.Since(start).Seconds())
 }
 
 func handleHealth(w http.ResponseWriter, r *http.Request) {
@@ -151,7 +151,7 @@ func handleHealth(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Fprintf(w, string(response))
 
-	httpDurationsHistogram.WithLabelValues("health").Observe(time.Since(start).Seconds())
+	httpDurationsHistogram.WithLabelValues("/health").Observe(time.Since(start).Seconds())
 }
 
 func checkHealth(e, n, t string, ch chan<- Result) {
