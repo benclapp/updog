@@ -1,0 +1,7 @@
+dependencies:
+  - name: Google
+    http_endpoint: https://google.com
+    type: http
+  - name: Demo Prometheus
+    http_endpoint: http://demo.robustperception.io:9090/-/healthy
+    type: http
