@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"flag"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -13,6 +12,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	kingpin "gopkg.in/alecthomas/kingpin.v2"
 	yaml "gopkg.in/yaml.v2"
 
 	logg "github.com/go-kit/kit/log"
@@ -22,7 +22,11 @@ var logger logg.Logger
 
 var config = conf{}
 
-var addr = flag.String("listen-address", ":8080", "The address to listen on for HTTP requests.")
+var (
+	timeout    = kingpin.Flag("timeout", "Timeout for dependency checks").Short('t').Default("5s").Duration()
+	configPath = kingpin.Flag("config.path", "Path of configuration file").Short('c').Default("updog.yaml").String()
+	addr       = kingpin.Flag("listen-address", "Address to listen on for HTTP requests").Default(":8080").String()
+)
 
 var (
 	httpDurationsHistogram = prometheus.NewHistogramVec(
@@ -59,12 +63,14 @@ var (
 )
 
 func init() {
+	kingpin.UsageTemplate(kingpin.CompactUsageTemplate).Version("0.1.0").Author("Ben Clapp")
+	kingpin.CommandLine.Help = "Service to aggregate health checks. Returns 502 if any fail."
+	kingpin.Parse()
 
 	logger = logg.NewLogfmtLogger(logg.NewSyncWriter(os.Stderr))
 	logger = logg.With(logger, "ts", logg.DefaultTimestampUTC, "caller", logg.DefaultCaller)
 
-	logger.Log("msg", "Loading config")
-	config.getConf()
+	config.getConf(configPath)
 
 	prometheus.MustRegister(
 		httpDurationsHistogram,
@@ -84,7 +90,6 @@ func init() {
 }
 
 func main() {
-	flag.Parse()
 
 	http.Handle("/metrics", promhttp.Handler())
 	http.HandleFunc("/ping", handlePing)
@@ -191,9 +196,9 @@ type conf struct {
 	} `yaml:"dependencies"`
 }
 
-func (c *conf) getConf() *conf {
+func (c *conf) getConf(path string) *conf {
 
-	yamlFile, err := ioutil.ReadFile("sample-configuration.yaml")
+	yamlFile, err := ioutil.ReadFile(path)
 	if err != nil {
 		log.Printf("yamlFile.Get err   #%v ", err)
 	}
