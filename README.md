@@ -74,6 +74,7 @@ Name | Description | Type | Labels
 
 ## To Do
 
+1. release binaries and docker image
 1. loadtest
 1. metric for /health latency excluding dependencies
 1. check for non http dependencies
