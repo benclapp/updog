@@ -5,3 +5,6 @@ dependencies:
   - name: Demo Prometheus
     http_endpoint: http://demo.robustperception.io:9090/-/healthy
     type: http
+  - name: Failure Response
+    http_endpoint: http://demo.robustperception.io:9090/-/healthy/foo
+    type: http

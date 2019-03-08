@@ -23,12 +23,15 @@ var logger logg.Logger
 var config = conf{}
 
 var (
-	timeout    = kingpin.Flag("timeout", "Timeout for dependency checks").Short('t').Default("5s").Duration()
-	configPath = kingpin.Flag("config.path", "Path of configuration file").Short('c').Default("updog.yaml").String()
-	addr       = kingpin.Flag("listen.address", "Address to listen on for HTTP requests").Default(":8080").String()
+	timeout       = kingpin.Flag("timeout", "Timeout for dependency checks").Short('t').Default("5s").Duration()
+	configPath    = kingpin.Flag("config.path", "Path of configuration file").Short('c').Default("updog.yaml").String()
+	listenAddress = kingpin.Flag("listen.address", "Address to listen on for HTTP requests").Default(":1111").String()
 )
 
-var depTimeout time.Duration
+var (
+	depTimeout time.Duration
+	addr       string
+)
 
 var (
 	httpDurationsHistogram = prometheus.NewHistogramVec(
@@ -83,6 +86,11 @@ func init() {
 	}
 	depTimeout = *timeout
 
+	if listenAddress == nil {
+		logger.Log("msg", "listen.address required")
+	}
+	addr = *listenAddress
+
 	prometheus.MustRegister(
 		httpDurationsHistogram,
 		healthCheckDependencyDuration,
@@ -106,7 +114,7 @@ func main() {
 	http.HandleFunc("/ping", handlePing)
 	http.HandleFunc("/health", handleHealth)
 
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	log.Fatal(http.ListenAndServe(addr, nil))
 }
 
 func handlePing(w http.ResponseWriter, r *http.Request) {
