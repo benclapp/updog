@@ -25,8 +25,10 @@ var config = conf{}
 var (
 	timeout    = kingpin.Flag("timeout", "Timeout for dependency checks").Short('t').Default("5s").Duration()
 	configPath = kingpin.Flag("config.path", "Path of configuration file").Short('c').Default("updog.yaml").String()
-	addr       = kingpin.Flag("listen-address", "Address to listen on for HTTP requests").Default(":8080").String()
+	addr       = kingpin.Flag("listen.address", "Address to listen on for HTTP requests").Default(":8080").String()
 )
+
+var depTimeout time.Duration
 
 var (
 	httpDurationsHistogram = prometheus.NewHistogramVec(
@@ -63,14 +65,23 @@ var (
 )
 
 func init() {
+	logger = logg.NewLogfmtLogger(logg.NewSyncWriter(os.Stderr))
+	logger = logg.With(logger, "ts", logg.DefaultTimestampUTC, "caller", logg.DefaultCaller)
+
 	kingpin.UsageTemplate(kingpin.CompactUsageTemplate).Version("0.1.0").Author("Ben Clapp")
 	kingpin.CommandLine.Help = "Service to aggregate health checks. Returns 502 if any fail."
 	kingpin.Parse()
 
-	logger = logg.NewLogfmtLogger(logg.NewSyncWriter(os.Stderr))
-	logger = logg.With(logger, "ts", logg.DefaultTimestampUTC, "caller", logg.DefaultCaller)
+	if configPath == nil {
+		logger.Log("msg", "Config file required")
+	}
+	cfg := *configPath
+	config.getConf(cfg)
 
-	config.getConf(configPath)
+	if timeout == nil {
+		logger.Log("msg", "timeout required")
+	}
+	depTimeout = *timeout
 
 	prometheus.MustRegister(
 		httpDurationsHistogram,
@@ -95,7 +106,7 @@ func main() {
 	http.HandleFunc("/ping", handlePing)
 	http.HandleFunc("/health", handleHealth)
 
-	log.Fatal(http.ListenAndServe(*addr, nil))
+	log.Fatal(http.ListenAndServe(":8080", nil))
 }
 
 func handlePing(w http.ResponseWriter, r *http.Request) {
@@ -139,9 +150,9 @@ func checkHealth(e, n, t string, ch chan<- Result) {
 	start := time.Now()
 	// logger.Log("msg", "Starting dep check for", n, "at", start.UnixNano())
 
-	timeout := time.Duration(9500 * time.Millisecond)
+	// _timeout := time.Duration(depTimeout)
 	client := http.Client{
-		Timeout: timeout,
+		Timeout: depTimeout,
 	}
 
 	//hit endpoint
