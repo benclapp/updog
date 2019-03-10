@@ -58,7 +58,7 @@ The following flags can be supplied on startup.
 Flags:
       --help                    Show context-sensitive help (also try --help-long and --help-man).
   -t, --timeout=5s              Timeout for dependency checks
-  -c, --config.path="config/updog.yaml"
+  -c, --config.path="updog.yaml"
                                 Path of configuration file
       --listen.address=":1111"  Address to listen on for HTTP requests
       --version                 Show application version.
