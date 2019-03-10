@@ -73,13 +73,3 @@ Name | Description | Type | Labels
 `updog_dependency_duration_seconds` | Latency of the outbound dependency check. | Histogram | `dependency`
 `updog_dependency_checks_total` | Count of total health checks per dependency. | Counter | `dependency`
 `updog_dependency_check_failures_total` | Count of total health check failures per dependency. | Counter | `dependency`
-
-## To Do
-
-1. release binaries and docker image
-1. loadtest
-1. metric for /health latency excluding dependencies
-1. check for non http dependencies
-    - database
-    - redis
-    - rabbitmq
