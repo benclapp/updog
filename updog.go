@@ -48,7 +48,7 @@ var (
 			Name: "updog_dependency_duration_seconds",
 			Help: "Duration of a health check dependency in seconds",
 		},
-		[]string{"depenency"},
+		[]string{"dependency"},
 	)
 
 	healthChecksTotal = prometheus.NewCounterVec(
