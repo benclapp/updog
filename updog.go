@@ -4,19 +4,20 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"os"
-
 	"log"
 	"net/http"
+	"os"
 	"time"
 
+	logg "github.com/go-kit/kit/log"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	kingpin "gopkg.in/alecthomas/kingpin.v2"
 	yaml "gopkg.in/yaml.v2"
-
-	logg "github.com/go-kit/kit/log"
 )
+
+var version string
+var gitCommit string
 
 var logger logg.Logger
 
@@ -24,7 +25,7 @@ var config = conf{}
 
 var (
 	timeout       = kingpin.Flag("timeout", "Timeout for dependency checks").Short('t').Default("5s").Duration()
-	configPath    = kingpin.Flag("config.path", "Path of configuration file").Short('c').Default("config/updog.yaml").String()
+	configPath    = kingpin.Flag("config.path", "Path of configuration file").Short('c').Default("updog.yaml").String()
 	listenAddress = kingpin.Flag("listen.address", "Address to listen on for HTTP requests").Default(":1111").String()
 )
 
@@ -71,7 +72,7 @@ func init() {
 	logger = logg.NewLogfmtLogger(logg.NewSyncWriter(os.Stderr))
 	logger = logg.With(logger, "ts", logg.DefaultTimestampUTC, "caller", logg.DefaultCaller)
 
-	kingpin.UsageTemplate(kingpin.CompactUsageTemplate).Version("0.1.0").Author("Ben Clapp")
+	kingpin.UsageTemplate(kingpin.CompactUsageTemplate).Version(version)
 	kingpin.CommandLine.Help = "Service to aggregate health checks. Returns 502 if any fail."
 	kingpin.Parse()
 
@@ -189,6 +190,20 @@ func checkHealth(e, n, t string, ch chan<- Result) {
 	}
 }
 
+func (c *conf) getConf(path string) *conf {
+
+	yamlFile, err := ioutil.ReadFile(path)
+	if err != nil {
+		log.Fatalf("yamlFile.Get err   #%v ", err)
+	}
+	err = yaml.Unmarshal(yamlFile, c)
+	if err != nil {
+		log.Fatalf("Unmarshal: %v", err)
+	}
+
+	return c
+}
+
 type resultResponse struct {
 	Result []struct {
 		Name       string  `json:"name"`
@@ -213,18 +228,4 @@ type conf struct {
 		Name         string `yaml:"name"`
 		Type         string `yaml:"type"`
 	} `yaml:"dependencies"`
-}
-
-func (c *conf) getConf(path string) *conf {
-
-	yamlFile, err := ioutil.ReadFile(path)
-	if err != nil {
-		log.Printf("yamlFile.Get err   #%v ", err)
-	}
-	err = yaml.Unmarshal(yamlFile, c)
-	if err != nil {
-		log.Fatalf("Unmarshal: %v", err)
-	}
-
-	return c
 }
