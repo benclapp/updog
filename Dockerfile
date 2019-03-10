@@ -1,15 +1,24 @@
+from alpine:latest as certificates
+RUN apk update && apk add --no-cache git ca-certificates && update-ca-certificates
+
+
 FROM golang:1.12 as builder
 
 WORKDIR $GOPATH/src/github.com/benclapp/updog
 COPY . .
 
 RUN go get -d -v
-RUN go build -o /app/updog
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags "-X main.version=$(cat VERSION)" -o /app/updog
 
 
 FROM scratch
 
+# Copy certs from ubunu as they don't exist from scratch
+COPY --from=certificates /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=builder /app/updog /app/updog
-COPY config/*.yaml /config/
 
+# Import a sample config
+COPY config/updog.yaml /app/config/updog.yaml
+
+WORKDIR /app
 ENTRYPOINT [ "/app/updog" ]
