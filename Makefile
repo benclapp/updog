@@ -22,13 +22,13 @@ deps:
 build-all: deps
 		for OS in linux darwin windows ; do \
 			env GOOS=$$OS GOARCH=amd64 $(GOBUILD) $(GOFLAGS) ; \
-			mkdir updog-$$OS-amd64 ; \
-			if [ -f updog ] ; then mv updog updog-$$OS-amd64 ; fi ; \
-			if [ -f updog.exe ] ; then mv updog.exe updog-$$OS-amd64 ; fi ; \
-			cp updog.yaml updog-$$OS-amd64 ; \
-			tar -czf updog-$$OS-amd64.tar.gz updog-$$OS-amd64 ; \
-			mv updog-$$OS-amd64.tar.gz bin/ ; \
-			rm -rf updog-$$OS-amd64 ; \
+			mkdir updog-$(VERSION)-$$OS-amd64 ; \
+			if [ -f updog ] ; then mv updog updog-$(VERSION)-$$OS-amd64 ; fi ; \
+			if [ -f updog.exe ] ; then mv updog.exe updog-$(VERSION)-$$OS-amd64 ; fi ; \
+			cp updog.yaml updog-$(VERSION)-$$OS-amd64 ; \
+			tar -czf updog-$(VERSION)-$$OS-amd64.tar.gz updog-$(VERSION)-$$OS-amd64 ; \
+			mv updog-$(VERSION)-$$OS-amd64.tar.gz bin/ ; \
+			rm -rf updog-$(VERSION)-$$OS-amd64 ; \
 		done
 
 docker:
