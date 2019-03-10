@@ -1,5 +1,6 @@
 # Go parameters
 VERSION=$(shell cat VERSION)
+VERSION_MINOR=$(shell cat VERSION_MINOR)
 GOCMD=go
 GOBUILD=$(GOCMD) build
 GOFLAGS=-ldflags "-X main.version=$(VERSION)"
@@ -31,4 +32,8 @@ build-all: deps
 		done
 
 docker:
-		docker build -t benclapp/updog:$(VERSION) .
+		docker build -t benclapp/updog:$(VERSION) -t benclapp/updog:$(VERSION_MINOR) -t benclapp/updog:latest .
+		docker push benclapp/updog:$(VERSION)
+		docker push benclapp/updog:$(VERSION_MINOR)
+		docker push benclapp/updog:latest
+
