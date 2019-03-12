@@ -1,10 +1,8 @@
 dependencies:
+  http:
   - name: Google
     http_endpoint: https://google.com
-    type: http
-  - name: Demo Prometheus
-    http_endpoint: http://demo.robustperception.io:9090/-/healthy
-    type: http
-  - name: Failure Response
+  - name: GitHub
+    http_endpoint: https://github.com
+  - name: Failure Dependency
     http_endpoint: http://demo.robustperception.io:9090/-/healthy/foo
-    type: http

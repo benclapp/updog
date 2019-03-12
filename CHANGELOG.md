@@ -1,3 +1,7 @@
+## 0.2.0
+
+- [CHANGE] Refactor config file and `/health` for nicer handling of multiple dependencies
+
 ## 0.1.1
 
 - Fix typo for dependency label name
