@@ -9,27 +9,26 @@ Checks of dependencies are executed in parallel, to ensure one slow dependency d
 
 ```json
 {
-    "results": [
-        {
-            "name": "Google",
-            "type": "http",
-            "success": true,
-            "duration": 0.271072
-        },
-        {
-            "name": "Prometheus",
-            "type": "http",
-            "success": true,
-            "duration": 0.538225
-        },
-        {
-            "name": "Failure Response",
-            "type": "http",
-            "success": false,
-            "duration": 0.549877,
-            "httpStatus": "404 Not Found"
-        }
+  "results": {
+    "http": [
+      {
+        "name": "Google",
+        "success": true,
+        "duration": 1.003521066
+      },
+      {
+        "name": "GitHub",
+        "success": true,
+        "duration": 1.040340163
+      },
+      {
+        "name": "Failure Dependency",
+        "success": false,
+        "duration": 1.242335411,
+        "httpStatus": "404 Not Found"
+      }
     ]
+  }
 }
 ```
 
@@ -39,15 +38,13 @@ Configuration of the downstream dependencies is done with a simple YAML file.
 
 ```yaml
 dependencies:
+  http:
   - name: Google
-    http_endpoint: 'https://google.com'
-    type: http
+    http_endpoint: https://google.com
   - name: GitHub
-    http_endpoint: 'https://github.com'
-    type: http
+    http_endpoint: https://github.com
   - name: Prometheus
-    http_endpoint: 'http://demo.robustperception.io:9090/-/healthy'
-    type: http
+    http_endpoint: http://demo.robustperception.io:9090/-/healthy
 ```
 
 ### Flags

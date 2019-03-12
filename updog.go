@@ -100,8 +100,8 @@ func init() {
 	)
 
 	logger.Log("msg", "Dependencies:")
-	for _, dep := range config.Dependencies {
-		logger.Log("dependency_name", dep.Name, "dependency_type", dep.Type, "dependency_endpoint", dep.HTTPEndpoint)
+	for _, dep := range config.Dependencies.HTTP {
+		logger.Log("dependency_name", dep.Name, "dependency_type", "http", "dependency_endpoint", dep.HTTPEndpoint)
 
 		healthCheckDependencyDuration.WithLabelValues(dep.Name).Observe(0)
 		healthChecksTotal.WithLabelValues(dep.Name).Add(0)
@@ -126,18 +126,18 @@ func handlePing(w http.ResponseWriter, r *http.Request) {
 
 func handleHealth(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
-	ch := make(chan Result)
+	ch := make(chan HTTPResult)
 
-	for _, dep := range config.Dependencies {
-		go checkHealth(dep.HTTPEndpoint, dep.Name, dep.Type, ch)
+	for _, dep := range config.Dependencies.HTTP {
+		go checkHealth(dep.HTTPEndpoint, dep.Name, ch)
 	}
 
 	var results = resultResponse{}
 	var pass = true
-	for range config.Dependencies {
+	for range config.Dependencies.HTTP {
 		res := <-ch
 
-		results.Result = append(results.Result, res)
+		results.Dependencies.HTTP = append(results.Dependencies.HTTP, res)
 		if res.Success == false {
 			pass = false
 		}
@@ -155,7 +155,7 @@ func handleHealth(w http.ResponseWriter, r *http.Request) {
 	httpDurationsHistogram.WithLabelValues("/health").Observe(time.Since(start).Seconds())
 }
 
-func checkHealth(e, n, t string, ch chan<- Result) {
+func checkHealth(e, n string, ch chan<- HTTPResult) {
 	start := time.Now()
 	// logger.Log("msg", "Starting dep check for", n, "at", start.UnixNano())
 
@@ -176,17 +176,17 @@ func checkHealth(e, n, t string, ch chan<- Result) {
 	if err != nil {
 		logger.Log("msg", "Error while checking dependency", "err", err)
 		healthChecksFailuresTotal.WithLabelValues(n).Inc()
-		ch <- Result{Name: n, Type: t, Success: false, Duration: elapsed}
+		ch <- HTTPResult{Name: n, Success: false, Duration: elapsed}
 		return
 	}
 
 	//check response code
 	if resp.StatusCode >= 200 && resp.StatusCode <= 299 {
-		ch <- Result{Name: n, Type: t, Success: true, Duration: elapsed}
+		ch <- HTTPResult{Name: n, Success: true, Duration: elapsed}
 	} else {
 		healthChecksFailuresTotal.WithLabelValues(n).Inc()
 		logger.Log("msg", "health check dependency failed", "dependency_name", n, "response_code", resp.Status, "duration", elapsed)
-		ch <- Result{Name: n, Type: t, Success: false, Duration: elapsed, HTTPStatus: resp.Status}
+		ch <- HTTPResult{Name: n, Success: false, Duration: elapsed, HTTPStatus: resp.Status}
 	}
 }
 
@@ -205,27 +205,28 @@ func (c *conf) getConf(path string) *conf {
 }
 
 type resultResponse struct {
-	Result []struct {
-		Name       string  `json:"name"`
-		Type       string  `json:"type"`
-		Success    bool    `json:"success"`
-		Duration   float64 `json:"duration"`
-		HTTPStatus string  `json:"httpStatus,omitempty"`
+	Dependencies struct {
+		HTTP []struct {
+			Name       string  `json:"name"`
+			Success    bool    `json:"success"`
+			Duration   float64 `json:"duration"`
+			HTTPStatus string  `json:"httpStatus,omitempty"`
+		} `json:"http"`
 	} `json:"results"`
 }
 
-type Result struct {
+type HTTPResult struct {
 	Name       string  `json:"name"`
-	Type       string  `json:"type"`
 	Success    bool    `json:"success"`
 	Duration   float64 `json:"duration"`
 	HTTPStatus string  `json:"httpStatus,omitempty"`
 }
 
 type conf struct {
-	Dependencies []struct {
-		HTTPEndpoint string `yaml:"http_endpoint"`
-		Name         string `yaml:"name"`
-		Type         string `yaml:"type"`
+	Dependencies struct {
+		HTTP []struct {
+			HTTPEndpoint string `yaml:"http_endpoint"`
+			Name         string `yaml:"name"`
+		} `yaml:"http"`
 	} `yaml:"dependencies"`
 }
