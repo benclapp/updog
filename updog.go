@@ -101,11 +101,15 @@ func init() {
 
 	logger.Log("msg", "Dependencies:")
 	for _, dep := range config.Dependencies.HTTP {
-		logger.Log("dependency_name", dep.Name, "dependency_type", "http", "dependency_endpoint", dep.HTTPEndpoint)
+		logger.Log("dependency_type", "http", "dependency_name", dep.Name, "dependency_endpoint", dep.HTTPEndpoint)
 
 		healthCheckDependencyDuration.WithLabelValues(dep.Name).Observe(0)
 		healthChecksTotal.WithLabelValues(dep.Name).Add(0)
 		healthChecksFailuresTotal.WithLabelValues(dep.Name).Add(0)
+	}
+
+	for _, red := range config.Dependencies.Redis {
+		logger.Log("dependency_type", "Redis", "dependency_name", red.Name, "redis_address", red.Address, "redis_password", "hunter2********")
 	}
 }
 
@@ -225,8 +229,13 @@ type HTTPResult struct {
 type conf struct {
 	Dependencies struct {
 		HTTP []struct {
-			HTTPEndpoint string `yaml:"http_endpoint"`
 			Name         string `yaml:"name"`
+			HTTPEndpoint string `yaml:"http_endpoint"`
 		} `yaml:"http"`
+		Redis []struct {
+			Name     string `yaml:"name"`
+			Address  string `yaml:"address"`
+			Password string `yaml:"password"`
+		}
 	} `yaml:"dependencies"`
 }

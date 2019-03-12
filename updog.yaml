@@ -6,3 +6,7 @@ dependencies:
     http_endpoint: https://github.com
   - name: Prometheus
     http_endpoint: http://demo.robustperception.io:9090/-/healthy
+  redis:
+  - name: foo
+    address: foo.redis.svc.cluster.local:6380
+    password: SecretPassword
