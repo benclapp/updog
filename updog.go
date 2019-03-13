@@ -185,7 +185,7 @@ func checkHTTP(e, n string, ch chan<- HTTPResult) {
 	healthChecksTotal.WithLabelValues(n).Inc()
 
 	if err != nil {
-		logger.Log("msg", "Error while checking dependency", "err", err)
+		logger.Log("msg", "Error while checking dependency", "dependency", n, "err", err)
 		healthChecksFailuresTotal.WithLabelValues(n).Inc()
 		ch <- HTTPResult{Name: n, Success: false, Duration: elapsed}
 		return
@@ -203,18 +203,28 @@ func checkHTTP(e, n string, ch chan<- HTTPResult) {
 
 func checkRedis(n, a, p string, ch chan<- RedisResult) {
 	start := time.Now()
-
+	// logger.Log("msg", "creating redis client")
 	client := redis.NewClient(&redis.Options{
 		Addr:     a,
 		Password: p,
 		DB:       0,
 	})
-
+	logger.Log("msg", "Redis client created", "duration", time.Since(start).Seconds())
 	pong, err := client.Ping().Result()
-	logger.Log("pong", pong, "err", err)
 
-	healthCheckDependencyDuration.WithLabelValues(n).Observe(time.Since(start).Seconds())
+	elapsed := time.Since(start).Seconds()
+	logger.Log("pong", pong, "err", err, "duration", elapsed)
+
+	healthCheckDependencyDuration.WithLabelValues(n).Observe(elapsed)
 	healthChecksTotal.WithLabelValues(n).Inc()
+
+	if err != nil {
+		logger.Log("msg", "Error while checking dependency", "dependency", n, "err", err)
+		healthChecksFailuresTotal.WithLabelValues(n).Inc()
+		ch <- RedisResult{Name: n, Success: false, Duration: elapsed}
+	} else {
+		ch <- RedisResult{Name: n, Success: true, Duration: elapsed}
+	}
 }
 
 func (c *conf) getConf(path string) *conf {
@@ -243,7 +253,7 @@ type resultResponse struct {
 			Name     string  `json:"name"`
 			Success  bool    `json:"success"`
 			Duration float64 `json:"duration"`
-		}
+		} `json:"redis"`
 	} `json:"results"`
 }
 
@@ -258,6 +268,10 @@ type RedisResult struct {
 	Name     string  `json:"name"`
 	Success  bool    `json:"success"`
 	Duration float64 `json:"duration"`
+}
+
+type redises []struct {
+	client *redis.Client
 }
 
 type conf struct {
