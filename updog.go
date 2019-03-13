@@ -10,6 +10,7 @@ import (
 	"time"
 
 	logg "github.com/go-kit/kit/log"
+	"github.com/go-redis/redis"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	kingpin "gopkg.in/alecthomas/kingpin.v2"
@@ -130,18 +131,28 @@ func handlePing(w http.ResponseWriter, r *http.Request) {
 
 func handleHealth(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
-	ch := make(chan HTTPResult)
+	httpCh := make(chan HTTPResult)
+	redisCh := make(chan RedisResult)
+	results := resultResponse{}
+	pass := true
 
 	for _, dep := range config.Dependencies.HTTP {
-		go checkHealth(dep.HTTPEndpoint, dep.Name, ch)
+		go checkHTTP(dep.HTTPEndpoint, dep.Name, httpCh)
+	}
+	for _, dep := range config.Dependencies.Redis {
+		go checkRedis(dep.Name, dep.Address, dep.Password, redisCh)
 	}
 
-	var results = resultResponse{}
-	var pass = true
 	for range config.Dependencies.HTTP {
-		res := <-ch
-
-		results.Dependencies.HTTP = append(results.Dependencies.HTTP, res)
+		res := <-httpCh
+		results.Dependencies.HTTPResult = append(results.Dependencies.HTTPResult, res)
+		if res.Success == false {
+			pass = false
+		}
+	}
+	for range config.Dependencies.Redis {
+		res := <-redisCh
+		results.Dependencies.RedisResult = append(results.Dependencies.RedisResult, res)
 		if res.Success == false {
 			pass = false
 		}
@@ -153,17 +164,14 @@ func handleHealth(w http.ResponseWriter, r *http.Request) {
 
 	re := &results
 	response, _ := json.MarshalIndent(re, "", "    ")
-
 	fmt.Fprintf(w, string(response))
 
 	httpDurationsHistogram.WithLabelValues("/health").Observe(time.Since(start).Seconds())
 }
 
-func checkHealth(e, n string, ch chan<- HTTPResult) {
+func checkHTTP(e, n string, ch chan<- HTTPResult) {
 	start := time.Now()
-	// logger.Log("msg", "Starting dep check for", n, "at", start.UnixNano())
 
-	// _timeout := time.Duration(depTimeout)
 	client := http.Client{
 		Timeout: depTimeout,
 	}
@@ -173,7 +181,6 @@ func checkHealth(e, n string, ch chan<- HTTPResult) {
 
 	//stop timing
 	elapsed := float64(time.Since(start).Seconds())
-
 	healthCheckDependencyDuration.WithLabelValues(n).Observe(elapsed)
 	healthChecksTotal.WithLabelValues(n).Inc()
 
@@ -194,6 +201,22 @@ func checkHealth(e, n string, ch chan<- HTTPResult) {
 	}
 }
 
+func checkRedis(n, a, p string, ch chan<- RedisResult) {
+	start := time.Now()
+
+	client := redis.NewClient(&redis.Options{
+		Addr:     a,
+		Password: p,
+		DB:       0,
+	})
+
+	pong, err := client.Ping().Result()
+	logger.Log("pong", pong, "err", err)
+
+	healthCheckDependencyDuration.WithLabelValues(n).Observe(time.Since(start).Seconds())
+	healthChecksTotal.WithLabelValues(n).Inc()
+}
+
 func (c *conf) getConf(path string) *conf {
 
 	yamlFile, err := ioutil.ReadFile(path)
@@ -210,12 +233,17 @@ func (c *conf) getConf(path string) *conf {
 
 type resultResponse struct {
 	Dependencies struct {
-		HTTP []struct {
+		HTTPResult []struct {
 			Name       string  `json:"name"`
 			Success    bool    `json:"success"`
 			Duration   float64 `json:"duration"`
 			HTTPStatus string  `json:"httpStatus,omitempty"`
 		} `json:"http"`
+		RedisResult []struct {
+			Name     string  `json:"name"`
+			Success  bool    `json:"success"`
+			Duration float64 `json:"duration"`
+		}
 	} `json:"results"`
 }
 
@@ -224,6 +252,12 @@ type HTTPResult struct {
 	Success    bool    `json:"success"`
 	Duration   float64 `json:"duration"`
 	HTTPStatus string  `json:"httpStatus,omitempty"`
+}
+
+type RedisResult struct {
+	Name     string  `json:"name"`
+	Success  bool    `json:"success"`
+	Duration float64 `json:"duration"`
 }
 
 type conf struct {
