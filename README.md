@@ -112,6 +112,10 @@ Flags:
       --version                 Show application version.
 ```
 
+## Docker
+
+Docker images available at [Docker Hub](https://hub.docker.com/r/benclapp/updog)
+
 ## Metrics
 
 Metrics are exposed in the Prometheus format, at the standard `/metrics` endpoint.
