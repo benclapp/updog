@@ -117,8 +117,6 @@ func init() {
 	}
 
 	for _, red := range config.Dependencies.Redis {
-		logger.Log("dependency_type", "Redis", "dependency_name", red.Name, "redis_address", red.Address, "redis_password", "hunter2********")
-
 		if red.Ssl {
 			redCli := redisClient{
 				name: red.Name,
@@ -143,6 +141,12 @@ func init() {
 			}
 			redisClients = append(redisClients, redCli)
 		}
+
+		logger.Log("dependency_type", "Redis", "dependency_name", red.Name, "redis_address", red.Address, "redis_password", "hunter2********")
+
+		healthCheckDependencyDuration.WithLabelValues(red.Name).Observe(0)
+		healthChecksTotal.WithLabelValues(red.Name).Add(0)
+		healthChecksFailuresTotal.WithLabelValues(red.Name).Add(0)
 	}
 }
 
