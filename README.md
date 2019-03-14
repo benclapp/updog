@@ -9,27 +9,70 @@ Checks of dependencies are executed in parallel, to ensure one slow dependency d
 
 ```json
 {
-    "results": [
-        {
-            "name": "Google",
-            "type": "http",
-            "success": true,
-            "duration": 0.271072
-        },
-        {
-            "name": "Prometheus",
-            "type": "http",
-            "success": true,
-            "duration": 0.538225
-        },
-        {
-            "name": "Failure Response",
-            "type": "http",
-            "success": false,
-            "duration": 0.549877,
-            "httpStatus": "404 Not Found"
-        }
-    ]
+    "results": {
+        "http": [
+            {
+                "name": "Closed Port",
+                "success": false,
+                "duration": 0.294109529,
+                "error": {
+                    "Op": "Get",
+                    "URL": "http://demo.robustperception.io:6090/-/healthy",
+                    "Err": {
+                        "Op": "dial",
+                        "Net": "tcp",
+                        "Source": null,
+                        "Addr": {
+                            "IP": "139.59.166.21",
+                            "Port": 6090,
+                            "Zone": ""
+                        },
+                        "Err": {
+                            "Syscall": "connect",
+                            "Err": 111
+                        }
+                    }
+                }
+            },
+            {
+                "name": "404",
+                "success": false,
+                "duration": 0.562796634,
+                "httpStatus": "404 Not Found"
+            },
+            {
+                "name": "Google",
+                "success": true,
+                "duration": 0.667266497
+            }
+        ],
+        "redis": [
+            {
+                "name": "closed port",
+                "success": false,
+                "duration": 0.016504383,
+                "error": {
+                    "Op": "dial",
+                    "Net": "tcp",
+                    "Source": null,
+                    "Addr": {
+                        "IP": "::1",
+                        "Port": 6379,
+                        "Zone": ""
+                    },
+                    "Err": {
+                        "Syscall": "connect",
+                        "Err": 111
+                    }
+                }
+            },
+            {
+                "name": "Redis foo",
+                "success": true,
+                "duration": 0.311321392
+            }
+        ]
+    }
 }
 ```
 
@@ -39,15 +82,20 @@ Configuration of the downstream dependencies is done with a simple YAML file.
 
 ```yaml
 dependencies:
+  http:
   - name: Google
-    http_endpoint: 'https://google.com'
-    type: http
+    http_endpoint: https://google.com
   - name: GitHub
-    http_endpoint: 'https://github.com'
-    type: http
-  - name: Prometheus
-    http_endpoint: 'http://demo.robustperception.io:9090/-/healthy'
-    type: http
+    http_endpoint: https://github.com
+  redis:
+  - name: Redis with SSL 
+    address: foo.redis.cache.windows.net:6380
+    password: securePassword
+    ssl: true
+  - name: Insecure Instance
+    address: localhost:6379
+    password: 
+    ssl: false  
 ```
 
 ### Flags
