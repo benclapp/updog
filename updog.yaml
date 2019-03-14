@@ -10,3 +10,4 @@ dependencies:
   - name: foo
     address: foo.redis.svc.cluster.local:6380
     password: SecretPassword
+    ssl: true
