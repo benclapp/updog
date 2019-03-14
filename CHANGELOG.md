@@ -1,7 +1,9 @@
 ## 0.2.0
 
 - [CHANGE] Refactor config file and `/health` for nicer handling of multiple dependency types
+- [CHANGE] Return more detailed error for dependency failures
 - [FEATURE] Add Redis health checks, both secure and insecure
+
 
 ## 0.1.1
 
