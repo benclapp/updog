@@ -182,7 +182,7 @@ func handleHealth(w http.ResponseWriter, r *http.Request) {
 			pass = false
 		}
 	}
-	for range config.Dependencies.Redis {
+	for range redisClients {
 		res := <-redisCh
 		results.Dependencies.RedisResult = append(results.Dependencies.RedisResult, res)
 		if res.Success == false {
@@ -203,24 +203,17 @@ func handleHealth(w http.ResponseWriter, r *http.Request) {
 
 func checkHTTP(e, n string, ch chan<- HTTPResult) {
 	start := time.Now()
-
-	//hit endpoint
 	resp, err := httpClient.Get(e)
-
-	//stop timing
 	elapsed := float64(time.Since(start).Seconds())
+
 	healthCheckDependencyDuration.WithLabelValues(n).Observe(elapsed)
 	healthChecksTotal.WithLabelValues(n).Inc()
 
 	if err != nil {
 		logger.Log("msg", "Error while checking dependency", "dependency", n, "err", err)
 		healthChecksFailuresTotal.WithLabelValues(n).Inc()
-		ch <- HTTPResult{Name: n, Success: false, Duration: elapsed}
-		return
-	}
-
-	//check response code
-	if resp.StatusCode >= 200 && resp.StatusCode <= 299 {
+		ch <- HTTPResult{Name: n, Success: false, Duration: elapsed, Err: err}
+	} else if resp.StatusCode >= 200 && resp.StatusCode <= 299 {
 		ch <- HTTPResult{Name: n, Success: true, Duration: elapsed}
 	} else {
 		healthChecksFailuresTotal.WithLabelValues(n).Inc()
@@ -231,21 +224,18 @@ func checkHTTP(e, n string, ch chan<- HTTPResult) {
 
 func checkRedis(rc redisClient, ch chan<- RedisResult) {
 	start := time.Now()
-
 	pong, err := rc.client.Ping().Result()
-
 	elapsed := time.Since(start).Seconds()
-	logger.Log("pong", pong, "err", err, "duration", elapsed)
 
 	healthCheckDependencyDuration.WithLabelValues(rc.name).Observe(elapsed)
 	healthChecksTotal.WithLabelValues(rc.name).Inc()
 
 	if err != nil {
-		logger.Log("msg", "Error while checking dependency", "dependency", rc.name, "err", err)
+		logger.Log("msg", "Error while checking dependency", "type", "Redis", "dependency", rc.name, "err", err)
 		healthChecksFailuresTotal.WithLabelValues(rc.name).Inc()
-		ch <- RedisResult{Name: rc.name, Success: false, Duration: elapsed}
+		ch <- RedisResult{Name: rc.name, Success: false, Duration: elapsed, Err: err}
 	} else {
-		ch <- RedisResult{Name: rc.name, Success: true, Duration: elapsed}
+		ch <- RedisResult{Name: rc.name, Success: true, Duration: elapsed, response: pong}
 	}
 }
 
@@ -270,11 +260,14 @@ type resultResponse struct {
 			Success    bool    `json:"success"`
 			Duration   float64 `json:"duration"`
 			HTTPStatus string  `json:"httpStatus,omitempty"`
+			Err        error   `json:"error,omitempty"`
 		} `json:"http"`
 		RedisResult []struct {
 			Name     string  `json:"name"`
 			Success  bool    `json:"success"`
 			Duration float64 `json:"duration"`
+			response string
+			Err      error `json:"error,omitempty"`
 		} `json:"redis"`
 	} `json:"results"`
 }
@@ -284,12 +277,15 @@ type HTTPResult struct {
 	Success    bool    `json:"success"`
 	Duration   float64 `json:"duration"`
 	HTTPStatus string  `json:"httpStatus,omitempty"`
+	Err        error   `json:"error,omitempty"`
 }
 
 type RedisResult struct {
 	Name     string  `json:"name"`
 	Success  bool    `json:"success"`
 	Duration float64 `json:"duration"`
+	response string
+	Err      error `json:"error,omitempty"`
 }
 
 type redisClientList []struct {
