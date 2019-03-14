@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -23,6 +24,9 @@ var gitCommit string
 var logger logg.Logger
 
 var config = conf{}
+
+var httpClient = http.Client{}
+var redisClients = redisClientList{}
 
 var (
 	timeout       = kingpin.Flag("timeout", "Timeout for dependency checks").Short('t').Default("5s").Duration()
@@ -87,6 +91,9 @@ func init() {
 		logger.Log("msg", "timeout required")
 	}
 	depTimeout = *timeout
+	httpClient = http.Client{
+		Timeout: depTimeout,
+	}
 
 	if listenAddress == nil {
 		logger.Log("msg", "listen.address required")
@@ -111,6 +118,31 @@ func init() {
 
 	for _, red := range config.Dependencies.Redis {
 		logger.Log("dependency_type", "Redis", "dependency_name", red.Name, "redis_address", red.Address, "redis_password", "hunter2********")
+
+		if red.Ssl {
+			redCli := redisClient{
+				name: red.Name,
+				client: redis.NewClient(
+					&redis.Options{
+						Addr:      red.Address,
+						Password:  red.Password,
+						DB:        0,
+						TLSConfig: &tls.Config{},
+					}),
+			}
+			redisClients = append(redisClients, redCli)
+		} else {
+			redCli := redisClient{
+				name: red.Name,
+				client: redis.NewClient(
+					&redis.Options{
+						Addr:     red.Address,
+						Password: red.Password,
+						DB:       0,
+					}),
+			}
+			redisClients = append(redisClients, redCli)
+		}
 	}
 }
 
@@ -139,8 +171,8 @@ func handleHealth(w http.ResponseWriter, r *http.Request) {
 	for _, dep := range config.Dependencies.HTTP {
 		go checkHTTP(dep.HTTPEndpoint, dep.Name, httpCh)
 	}
-	for _, dep := range config.Dependencies.Redis {
-		go checkRedis(dep.Name, dep.Address, dep.Password, redisCh)
+	for _, redCli := range redisClients {
+		go checkRedis(redCli, redisCh)
 	}
 
 	for range config.Dependencies.HTTP {
@@ -172,12 +204,8 @@ func handleHealth(w http.ResponseWriter, r *http.Request) {
 func checkHTTP(e, n string, ch chan<- HTTPResult) {
 	start := time.Now()
 
-	client := http.Client{
-		Timeout: depTimeout,
-	}
-
 	//hit endpoint
-	resp, err := client.Get(e)
+	resp, err := httpClient.Get(e)
 
 	//stop timing
 	elapsed := float64(time.Since(start).Seconds())
@@ -201,29 +229,23 @@ func checkHTTP(e, n string, ch chan<- HTTPResult) {
 	}
 }
 
-func checkRedis(n, a, p string, ch chan<- RedisResult) {
+func checkRedis(rc redisClient, ch chan<- RedisResult) {
 	start := time.Now()
-	// logger.Log("msg", "creating redis client")
-	client := redis.NewClient(&redis.Options{
-		Addr:     a,
-		Password: p,
-		DB:       0,
-	})
-	logger.Log("msg", "Redis client created", "duration", time.Since(start).Seconds())
-	pong, err := client.Ping().Result()
+
+	pong, err := rc.client.Ping().Result()
 
 	elapsed := time.Since(start).Seconds()
 	logger.Log("pong", pong, "err", err, "duration", elapsed)
 
-	healthCheckDependencyDuration.WithLabelValues(n).Observe(elapsed)
-	healthChecksTotal.WithLabelValues(n).Inc()
+	healthCheckDependencyDuration.WithLabelValues(rc.name).Observe(elapsed)
+	healthChecksTotal.WithLabelValues(rc.name).Inc()
 
 	if err != nil {
-		logger.Log("msg", "Error while checking dependency", "dependency", n, "err", err)
-		healthChecksFailuresTotal.WithLabelValues(n).Inc()
-		ch <- RedisResult{Name: n, Success: false, Duration: elapsed}
+		logger.Log("msg", "Error while checking dependency", "dependency", rc.name, "err", err)
+		healthChecksFailuresTotal.WithLabelValues(rc.name).Inc()
+		ch <- RedisResult{Name: rc.name, Success: false, Duration: elapsed}
 	} else {
-		ch <- RedisResult{Name: n, Success: true, Duration: elapsed}
+		ch <- RedisResult{Name: rc.name, Success: true, Duration: elapsed}
 	}
 }
 
@@ -270,7 +292,13 @@ type RedisResult struct {
 	Duration float64 `json:"duration"`
 }
 
-type redises []struct {
+type redisClientList []struct {
+	name   string
+	client *redis.Client
+}
+
+type redisClient struct {
+	name   string
 	client *redis.Client
 }
 
@@ -284,6 +312,7 @@ type conf struct {
 			Name     string `yaml:"name"`
 			Address  string `yaml:"address"`
 			Password string `yaml:"password"`
+			Ssl      bool   `yaml:"ssl"`
 		}
 	} `yaml:"dependencies"`
 }
