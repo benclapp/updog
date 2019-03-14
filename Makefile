@@ -13,13 +13,14 @@ build: deps
 		$(GOBUILD) $(GOFLAGS) -v
 clean:
 		$(GOCLEAN)
-		rm -rf bin/*
+		rm -rf bin
 		rm -rf updog-*
 run:
 		$(GORUN) $(GOFLAGS) updog.go
 deps:
 		$(GOGET) -d -v ./...
 build-all: deps
+		mkdir -p bin
 		for OS in linux darwin windows ; do \
 			env GOOS=$$OS GOARCH=amd64 $(GOBUILD) $(GOFLAGS) ; \
 			mkdir updog-$(VERSION)-$$OS-amd64 ; \
@@ -36,4 +37,3 @@ docker:
 		docker push benclapp/updog:$(VERSION)
 		docker push benclapp/updog:$(VERSION_MINOR)
 		docker push benclapp/updog:latest
-
