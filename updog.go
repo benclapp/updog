@@ -53,7 +53,7 @@ var (
 			Name: "updog_dependency_duration_seconds",
 			Help: "Duration of a health check dependency in seconds",
 		},
-		[]string{"dependency"},
+		[]string{"dependency", "dependency_type"},
 	)
 
 	healthChecksTotal = prometheus.NewCounterVec(
@@ -61,7 +61,7 @@ var (
 			Name: "updog_dependency_checks_total",
 			Help: "Count of total health checks per dependency",
 		},
-		[]string{"dependency"},
+		[]string{"dependency", "dependency_type"},
 	)
 
 	healthChecksFailuresTotal = prometheus.NewCounterVec(
@@ -69,7 +69,7 @@ var (
 			Name: "updog_dependency_check_failures_total",
 			Help: "Count of total health check failures per dependency",
 		},
-		[]string{"dependency"},
+		[]string{"dependency", "dependency_type"},
 	)
 )
 
@@ -111,9 +111,9 @@ func init() {
 	for _, dep := range config.Dependencies.HTTP {
 		logger.Log("dependency_type", "http", "dependency_name", dep.Name, "dependency_endpoint", dep.HTTPEndpoint)
 
-		healthCheckDependencyDuration.WithLabelValues(dep.Name).Observe(0)
-		healthChecksTotal.WithLabelValues(dep.Name).Add(0)
-		healthChecksFailuresTotal.WithLabelValues(dep.Name).Add(0)
+		healthCheckDependencyDuration.WithLabelValues(dep.Name, "http").Observe(0)
+		healthChecksTotal.WithLabelValues(dep.Name, "http").Add(0)
+		healthChecksFailuresTotal.WithLabelValues(dep.Name, "http").Add(0)
 	}
 
 	for _, red := range config.Dependencies.Redis {
@@ -144,9 +144,9 @@ func init() {
 
 		logger.Log("dependency_type", "Redis", "dependency_name", red.Name, "redis_address", red.Address, "redis_password", "hunter2********")
 
-		healthCheckDependencyDuration.WithLabelValues(red.Name).Observe(0)
-		healthChecksTotal.WithLabelValues(red.Name).Add(0)
-		healthChecksFailuresTotal.WithLabelValues(red.Name).Add(0)
+		healthCheckDependencyDuration.WithLabelValues(red.Name, "redis").Observe(0)
+		healthChecksTotal.WithLabelValues(red.Name, "redis").Add(0)
+		healthChecksFailuresTotal.WithLabelValues(red.Name, "redis").Add(0)
 	}
 }
 
@@ -210,17 +210,17 @@ func checkHTTP(e, n string, ch chan<- HTTPResult) {
 	resp, err := httpClient.Get(e)
 	elapsed := float64(time.Since(start).Seconds())
 
-	healthCheckDependencyDuration.WithLabelValues(n).Observe(elapsed)
-	healthChecksTotal.WithLabelValues(n).Inc()
+	healthCheckDependencyDuration.WithLabelValues(n, "http").Observe(elapsed)
+	healthChecksTotal.WithLabelValues(n, "http").Inc()
 
 	if err != nil {
 		logger.Log("msg", "Error while checking dependency", "dependency", n, "err", err)
-		healthChecksFailuresTotal.WithLabelValues(n).Inc()
+		healthChecksFailuresTotal.WithLabelValues(n, "http").Inc()
 		ch <- HTTPResult{Name: n, Success: false, Duration: elapsed, Err: err}
 	} else if resp.StatusCode >= 200 && resp.StatusCode <= 299 {
 		ch <- HTTPResult{Name: n, Success: true, Duration: elapsed}
 	} else {
-		healthChecksFailuresTotal.WithLabelValues(n).Inc()
+		healthChecksFailuresTotal.WithLabelValues(n, "http").Inc()
 		logger.Log("msg", "health check dependency failed", "dependency_name", n, "response_code", resp.Status, "duration", elapsed)
 		ch <- HTTPResult{Name: n, Success: false, Duration: elapsed, HTTPStatus: resp.Status}
 	}
@@ -231,12 +231,12 @@ func checkRedis(rc redisClient, ch chan<- RedisResult) {
 	pong, err := rc.client.Ping().Result()
 	elapsed := time.Since(start).Seconds()
 
-	healthCheckDependencyDuration.WithLabelValues(rc.name).Observe(elapsed)
-	healthChecksTotal.WithLabelValues(rc.name).Inc()
+	healthCheckDependencyDuration.WithLabelValues(rc.name, "redis").Observe(elapsed)
+	healthChecksTotal.WithLabelValues(rc.name, "redis").Inc()
 
 	if err != nil {
 		logger.Log("msg", "Error while checking dependency", "type", "Redis", "dependency", rc.name, "err", err)
-		healthChecksFailuresTotal.WithLabelValues(rc.name).Inc()
+		healthChecksFailuresTotal.WithLabelValues(rc.name, "redis").Inc()
 		ch <- RedisResult{Name: rc.name, Success: false, Duration: elapsed, Err: err}
 	} else {
 		ch <- RedisResult{Name: rc.name, Success: true, Duration: elapsed, response: pong}
