@@ -1,43 +1,22 @@
 package main
 
 import (
-	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
 	"time"
 
 	logg "github.com/go-kit/kit/log"
-	"github.com/go-redis/redis"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	kingpin "gopkg.in/alecthomas/kingpin.v2"
-	yaml "gopkg.in/yaml.v2"
 )
 
 var version string
-var gitCommit string
 
 var logger logg.Logger
-
-var config = conf{}
-
-var httpClient = http.Client{}
-var redisClients = redisClientList{}
-
-var (
-	timeout       = kingpin.Flag("timeout", "Timeout for dependency checks").Short('t').Default("5s").Duration()
-	configPath    = kingpin.Flag("config.path", "Path of configuration file").Short('c').Default("updog.yaml").String()
-	listenAddress = kingpin.Flag("listen.address", "Address to listen on for HTTP requests").Default(":1111").String()
-)
-
-var (
-	depTimeout time.Duration
-	addr       string
-)
 
 var (
 	httpDurationsHistogram = prometheus.NewHistogramVec(
@@ -81,24 +60,7 @@ func init() {
 	kingpin.CommandLine.Help = "Service to aggregate health checks. Returns 502 if any fail."
 	kingpin.Parse()
 
-	if configPath == nil {
-		logger.Log("msg", "Config file required")
-	}
-	cfg := *configPath
-	config.getConf(cfg)
-
-	if timeout == nil {
-		logger.Log("msg", "timeout required")
-	}
-	depTimeout = *timeout
-	httpClient = http.Client{
-		Timeout: depTimeout,
-	}
-
-	if listenAddress == nil {
-		logger.Log("msg", "listen.address required")
-	}
-	addr = *listenAddress
+	configure()
 
 	prometheus.MustRegister(
 		httpDurationsHistogram,
@@ -107,51 +69,13 @@ func init() {
 		healthChecksFailuresTotal,
 	)
 
-	logger.Log("msg", "Dependencies:")
-	for _, dep := range config.Dependencies.HTTP {
-		logger.Log("dependency_type", "http", "dependency_name", dep.Name, "dependency_endpoint", dep.HTTPEndpoint)
-
-		healthCheckDependencyDuration.WithLabelValues(dep.Name, "http").Observe(0)
-		healthChecksTotal.WithLabelValues(dep.Name, "http").Add(0)
-		healthChecksFailuresTotal.WithLabelValues(dep.Name, "http").Add(0)
-	}
-
-	for _, red := range config.Dependencies.Redis {
-		if red.Ssl {
-			redCli := redisClient{
-				name: red.Name,
-				client: redis.NewClient(
-					&redis.Options{
-						Addr:      red.Address,
-						Password:  red.Password,
-						DB:        0,
-						TLSConfig: &tls.Config{},
-					}),
-			}
-			redisClients = append(redisClients, redCli)
-		} else {
-			redCli := redisClient{
-				name: red.Name,
-				client: redis.NewClient(
-					&redis.Options{
-						Addr:     red.Address,
-						Password: red.Password,
-						DB:       0,
-					}),
-			}
-			redisClients = append(redisClients, redCli)
-		}
-
-		logger.Log("dependency_type", "Redis", "dependency_name", red.Name, "redis_address", red.Address, "redis_password", "hunter2********")
-
-		healthCheckDependencyDuration.WithLabelValues(red.Name, "redis").Observe(0)
-		healthChecksTotal.WithLabelValues(red.Name, "redis").Add(0)
-		healthChecksFailuresTotal.WithLabelValues(red.Name, "redis").Add(0)
-	}
+	logger.Log("msg", "Congigured Dependencies...")
+	initHTTP()
+	initRedis()
+	logger.Log("msg", "Finished initilisation")
 }
 
 func main() {
-
 	http.Handle("/metrics", promhttp.Handler())
 	http.HandleFunc("/ping", handlePing)
 	http.HandleFunc("/health", handleHealth)
@@ -172,6 +96,7 @@ func handleHealth(w http.ResponseWriter, r *http.Request) {
 	results := resultResponse{}
 	pass := true
 
+	// Start health checks concurrently
 	for _, dep := range config.Dependencies.HTTP {
 		go checkHTTP(dep.HTTPEndpoint, dep.Name, httpCh)
 	}
@@ -179,6 +104,7 @@ func handleHealth(w http.ResponseWriter, r *http.Request) {
 		go checkRedis(redCli, redisCh)
 	}
 
+	//Wait for health checks to return
 	for range config.Dependencies.HTTP {
 		res := <-httpCh
 		results.Dependencies.HTTPResult = append(results.Dependencies.HTTPResult, res)
@@ -194,125 +120,20 @@ func handleHealth(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Return 502 if any dependencies failed
 	if pass == false {
 		w.WriteHeader(http.StatusBadGateway)
 	}
 
-	re := &results
-	response, _ := json.MarshalIndent(re, "", "    ")
+	response, _ := json.MarshalIndent(&results, "", "    ")
 	fmt.Fprintf(w, string(response))
 
 	httpDurationsHistogram.WithLabelValues("/health").Observe(time.Since(start).Seconds())
 }
 
-func checkHTTP(e, n string, ch chan<- HTTPResult) {
-	start := time.Now()
-	resp, err := httpClient.Get(e)
-	elapsed := float64(time.Since(start).Seconds())
-
-	healthCheckDependencyDuration.WithLabelValues(n, "http").Observe(elapsed)
-	healthChecksTotal.WithLabelValues(n, "http").Inc()
-
-	if err != nil {
-		logger.Log("msg", "Error while checking dependency", "dependency", n, "err", err)
-		healthChecksFailuresTotal.WithLabelValues(n, "http").Inc()
-		ch <- HTTPResult{Name: n, Success: false, Duration: elapsed, Err: err}
-	} else if resp.StatusCode >= 200 && resp.StatusCode <= 299 {
-		ch <- HTTPResult{Name: n, Success: true, Duration: elapsed}
-	} else {
-		healthChecksFailuresTotal.WithLabelValues(n, "http").Inc()
-		logger.Log("msg", "health check dependency failed", "dependency_name", n, "response_code", resp.Status, "duration", elapsed)
-		ch <- HTTPResult{Name: n, Success: false, Duration: elapsed, HTTPStatus: resp.Status}
-	}
-}
-
-func checkRedis(rc redisClient, ch chan<- RedisResult) {
-	start := time.Now()
-	pong, err := rc.client.Ping().Result()
-	elapsed := time.Since(start).Seconds()
-
-	healthCheckDependencyDuration.WithLabelValues(rc.name, "redis").Observe(elapsed)
-	healthChecksTotal.WithLabelValues(rc.name, "redis").Inc()
-
-	if err != nil {
-		logger.Log("msg", "Error while checking dependency", "type", "Redis", "dependency", rc.name, "err", err)
-		healthChecksFailuresTotal.WithLabelValues(rc.name, "redis").Inc()
-		ch <- RedisResult{Name: rc.name, Success: false, Duration: elapsed, Err: err}
-	} else {
-		ch <- RedisResult{Name: rc.name, Success: true, Duration: elapsed, response: pong}
-	}
-}
-
-func (c *conf) getConf(path string) *conf {
-
-	yamlFile, err := ioutil.ReadFile(path)
-	if err != nil {
-		log.Fatalf("yamlFile.Get err   #%v ", err)
-	}
-	err = yaml.Unmarshal(yamlFile, c)
-	if err != nil {
-		log.Fatalf("Unmarshal: %v", err)
-	}
-
-	return c
-}
-
 type resultResponse struct {
 	Dependencies struct {
-		HTTPResult []struct {
-			Name       string  `json:"name"`
-			Success    bool    `json:"success"`
-			Duration   float64 `json:"duration"`
-			HTTPStatus string  `json:"httpStatus,omitempty"`
-			Err        error   `json:"error,omitempty"`
-		} `json:"http"`
-		RedisResult []struct {
-			Name     string  `json:"name"`
-			Success  bool    `json:"success"`
-			Duration float64 `json:"duration"`
-			response string
-			Err      error `json:"error,omitempty"`
-		} `json:"redis"`
+		HTTPResult  []HTTPResult  `json:"http"`
+		RedisResult []RedisResult `json:"redis"`
 	} `json:"results"`
-}
-
-type HTTPResult struct {
-	Name       string  `json:"name"`
-	Success    bool    `json:"success"`
-	Duration   float64 `json:"duration"`
-	HTTPStatus string  `json:"httpStatus,omitempty"`
-	Err        error   `json:"error,omitempty"`
-}
-
-type RedisResult struct {
-	Name     string  `json:"name"`
-	Success  bool    `json:"success"`
-	Duration float64 `json:"duration"`
-	response string
-	Err      error `json:"error,omitempty"`
-}
-
-type redisClientList []struct {
-	name   string
-	client *redis.Client
-}
-
-type redisClient struct {
-	name   string
-	client *redis.Client
-}
-
-type conf struct {
-	Dependencies struct {
-		HTTP []struct {
-			Name         string `yaml:"name"`
-			HTTPEndpoint string `yaml:"http_endpoint"`
-		} `yaml:"http"`
-		Redis []struct {
-			Name     string `yaml:"name"`
-			Address  string `yaml:"address"`
-			Password string `yaml:"password"`
-			Ssl      bool   `yaml:"ssl"`
-		}
-	} `yaml:"dependencies"`
 }
