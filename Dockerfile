@@ -4,10 +4,9 @@ RUN apk update && apk add --no-cache ca-certificates && update-ca-certificates
 
 FROM golang:1.12 as builder
 
-WORKDIR $GOPATH/src/github.com/benclapp/updog
+WORKDIR /build/github.com/benclapp/updog
 COPY . .
 
-RUN go get -d -v
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags "-X main.version=$(cat VERSION)" -o /app/updog
 
 
