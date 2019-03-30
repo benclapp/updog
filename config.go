@@ -68,6 +68,10 @@ type conf struct {
 			Address  string `yaml:"address"`
 			Password string `yaml:"password"`
 			Ssl      bool   `yaml:"ssl"`
-		}
+		} `yaml:"redis"`
+		MSSQL []struct {
+			Name             string `yaml:"name"`
+			ConnectionString string `yaml:"connectionString"`
+		} `yaml:"mssql"`
 	} `yaml:"dependencies"`
 }

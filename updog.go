@@ -72,6 +72,7 @@ func init() {
 	logger.Log("msg", "Congigured Dependencies...")
 	initHTTP()
 	initRedis()
+	initMSSQL()
 	logger.Log("msg", "Finished initilisation")
 }
 

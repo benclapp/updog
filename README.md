@@ -88,7 +88,7 @@ dependencies:
   - name: GitHub
     http_endpoint: https://github.com
   redis:
-  - name: Redis with SSL 
+  - name: Redis with SSL
     address: foo.redis.cache.windows.net:6380
     password: securePassword
     ssl: true
@@ -123,6 +123,6 @@ Metrics are exposed in the Prometheus format, at the standard `/metrics` endpoin
 Name | Description | Type | Labels
 -----|-------------|------|-------
 `updog_http_request_duration_seconds` | Inbound request latency. | Histogram | `path`
-`updog_dependency_duration_seconds` | Latency of the outbound dependency check. | Histogram | `dependency`
-`updog_dependency_checks_total` | Count of total health checks per dependency. | Counter | `dependency`
-`updog_dependency_check_failures_total` | Count of total health check failures per dependency. | Counter | `dependency`
+`updog_dependency_duration_seconds` | Latency of the outbound dependency check. | Histogram | `dependency`, `dependency_type`
+`updog_dependency_checks_total` | Count of total health checks per dependency. | Counter | `dependency`, `dependency_type`
+`updog_dependency_check_failures_total` | Count of total health check failures per dependency. | Counter | `dependency`, `dependency_type`
