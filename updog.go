@@ -105,8 +105,8 @@ func handleHealth(w http.ResponseWriter, r *http.Request) {
 	for _, redCli := range redisClients {
 		go checkRedis(redCli, redisCh)
 	}
-	for _, dep := range config.Dependencies.SQL {
-		go checkSQL(dep.Name, dep.Type, dep.ConnectionString, sqlCh)
+	for _, sqlCli := range sqlClients {
+		go checkSQL(sqlCli.Name, sqlCli.Type, sqlCli.Db, sqlCh)
 	}
 
 	//Wait for health checks to return
