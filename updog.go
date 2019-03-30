@@ -72,7 +72,7 @@ func init() {
 	logger.Log("msg", "Congigured Dependencies...")
 	initHTTP()
 	initRedis()
-	initMSSQL()
+	initSQL()
 	logger.Log("msg", "Finished initilisation")
 }
 
@@ -94,6 +94,7 @@ func handleHealth(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
 	httpCh := make(chan HTTPResult)
 	redisCh := make(chan RedisResult)
+	sqlCh := make(chan sqlResult)
 	results := resultResponse{}
 	pass := true
 
@@ -103,6 +104,9 @@ func handleHealth(w http.ResponseWriter, r *http.Request) {
 	}
 	for _, redCli := range redisClients {
 		go checkRedis(redCli, redisCh)
+	}
+	for _, dep := range config.Dependencies.SQL {
+		go checkSQL(dep.Name, dep.Type, dep.ConnectionString, sqlCh)
 	}
 
 	//Wait for health checks to return
@@ -116,6 +120,13 @@ func handleHealth(w http.ResponseWriter, r *http.Request) {
 	for range redisClients {
 		res := <-redisCh
 		results.Dependencies.RedisResult = append(results.Dependencies.RedisResult, res)
+		if res.Success == false {
+			pass = false
+		}
+	}
+	for range config.Dependencies.SQL {
+		res := <-sqlCh
+		results.Dependencies.SqlResult = append(results.Dependencies.SqlResult, res)
 		if res.Success == false {
 			pass = false
 		}
@@ -136,5 +147,6 @@ type resultResponse struct {
 	Dependencies struct {
 		HTTPResult  []HTTPResult  `json:"http"`
 		RedisResult []RedisResult `json:"redis"`
+		SqlResult   []sqlResult   `json:"sql"`
 	} `json:"results"`
 }
