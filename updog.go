@@ -8,6 +8,8 @@ import (
 	"os"
 	"time"
 
+	_ "net/http/pprof"
+
 	logg "github.com/go-kit/kit/log"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
