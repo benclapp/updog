@@ -74,12 +74,14 @@ func init() {
 	logger.Log("msg", "Congigured Dependencies...")
 	initHTTP()
 	initRedis()
+	initSQL()
 	logger.Log("msg", "Finished initilisation")
 }
 
 func main() {
 	http.Handle("/metrics", promhttp.Handler())
 	http.HandleFunc("/ping", handlePing)
+	http.HandleFunc("/updog", handleHealth)
 	http.HandleFunc("/health", handleHealth)
 
 	log.Fatal(http.ListenAndServe(addr, nil))
@@ -95,6 +97,7 @@ func handleHealth(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
 	httpCh := make(chan HTTPResult)
 	redisCh := make(chan RedisResult)
+	sqlCh := make(chan sqlResult)
 	results := resultResponse{}
 	pass := true
 
@@ -104,6 +107,9 @@ func handleHealth(w http.ResponseWriter, r *http.Request) {
 	}
 	for _, redCli := range redisClients {
 		go checkRedis(redCli, redisCh)
+	}
+	for _, sqlCli := range sqlClients {
+		go checkSQL(sqlCli.Name, sqlCli.Type, sqlCli.Db, sqlCh)
 	}
 
 	//Wait for health checks to return
@@ -121,6 +127,13 @@ func handleHealth(w http.ResponseWriter, r *http.Request) {
 			pass = false
 		}
 	}
+	for range config.Dependencies.SQL {
+		res := <-sqlCh
+		results.Dependencies.SqlResult = append(results.Dependencies.SqlResult, res)
+		if res.Success == false {
+			pass = false
+		}
+	}
 
 	// Return 502 if any dependencies failed
 	if pass == false {
@@ -130,12 +143,13 @@ func handleHealth(w http.ResponseWriter, r *http.Request) {
 	response, _ := json.MarshalIndent(&results, "", "    ")
 	fmt.Fprintf(w, string(response))
 
-	httpDurationsHistogram.WithLabelValues("/health").Observe(time.Since(start).Seconds())
+	httpDurationsHistogram.WithLabelValues(r.RequestURI).Observe(time.Since(start).Seconds())
 }
 
 type resultResponse struct {
 	Dependencies struct {
 		HTTPResult  []HTTPResult  `json:"http"`
 		RedisResult []RedisResult `json:"redis"`
+		SqlResult   []sqlResult   `json:"sql"`
 	} `json:"results"`
 }

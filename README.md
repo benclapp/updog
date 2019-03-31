@@ -3,39 +3,24 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/benclapp/updog)](https://goreportcard.com/report/github.com/benclapp/updog)
 [![Docker Pulls](https://img.shields.io/docker/pulls/benclapp/updog.svg?maxAge=604800)](https://hub.docker.com/r/benclapp/updog)
 
-Updog is a health check aggregator for scenarios where you have multiple micro services running in a group. For example you may have many data centres running the same services. Your geo-steered loadbalancer could hit updog's `/health` endpoint for the status of each data centre.
+Updog is a health check aggregator for scenarios where you have multiple micro services running in a group. For example you may have many data centres running the same services. Your geo-steered loadbalancer could hit updog's `/health` or `/updog` endpoint for the status of each data centre.
 
-Checks of dependencies are executed in parallel, to ensure one slow dependency doesn't risk causing an upstream timeout. The status of each dependency check is returned for adhoc debugging. Any response between `200 ≤ x ≤ 299` will succeed. `/health` returns a 502 if any dependencies fail. Sample response:
+Checks of dependencies are executed in parallel, to ensure one slow dependency doesn't risk causing an upstream timeout. The status of each dependency check is returned for adhoc debugging. Any response between `200 ≤ x ≤ 299` will succeed. `/health` and `/updog` return a 502 if any dependencies fail. Sample response:
 
 ```json
 {
     "results": {
         "http": [
             {
-                "name": "Closed Port",
+                "name": "Error",
                 "success": false,
                 "duration": 0.294109529,
                 "error": {
-                    "Op": "Get",
-                    "URL": "http://demo.robustperception.io:6090/-/healthy",
-                    "Err": {
-                        "Op": "dial",
-                        "Net": "tcp",
-                        "Source": null,
-                        "Addr": {
-                            "IP": "139.59.166.21",
-                            "Port": 6090,
-                            "Zone": ""
-                        },
-                        "Err": {
-                            "Syscall": "connect",
-                            "Err": 111
-                        }
-                    }
+                    "err": "some error"
                 }
             },
             {
-                "name": "404",
+                "name": "Not 2..",
                 "success": false,
                 "duration": 0.562796634,
                 "httpStatus": "404 Not Found"
@@ -48,28 +33,29 @@ Checks of dependencies are executed in parallel, to ensure one slow dependency d
         ],
         "redis": [
             {
-                "name": "closed port",
+                "name": "Error",
                 "success": false,
                 "duration": 0.016504383,
                 "error": {
-                    "Op": "dial",
-                    "Net": "tcp",
-                    "Source": null,
-                    "Addr": {
-                        "IP": "::1",
-                        "Port": 6379,
-                        "Zone": ""
-                    },
-                    "Err": {
-                        "Syscall": "connect",
-                        "Err": 111
-                    }
+                    "err": "some error"
                 }
             },
             {
-                "name": "Redis foo",
+                "name": "Redis",
                 "success": true,
                 "duration": 0.311321392
+            }
+        ],
+        "sql": [
+            {
+                "name": "grafana-test",
+                "success": true,
+                "duration": 1.1117e-05
+            },
+            {
+                "name": "qa",
+                "success": true,
+                "duration": 0.342005575
             }
         ]
     }
@@ -84,18 +70,27 @@ Configuration of the downstream dependencies is done with a simple YAML file.
 dependencies:
   http:
   - name: Google
-    http_endpoint: https://google.com
+    http_endpoint: "https://google.com"
   - name: GitHub
-    http_endpoint: https://github.com
+    http_endpoint: "https://github.com"
   redis:
-  - name: Redis with SSL 
-    address: foo.redis.cache.windows.net:6380
+  - name: Redis with SSL
+    address: "foo.redis.cache.windows.net:6380"
     password: securePassword
     ssl: true
   - name: Insecure Instance
-    address: localhost:6379
-    password: 
+    address: "localhost:6379"
+    password: ""
     ssl: false  
+  sql:
+  - name: Microsoft SQL Database
+    type: mssql
+    # Template sqlserver://username:password@db-server:port?paramName=paramValue
+    connectionString: "sqlserver://username:password@foo.database.windows.net:1433?database=dbname"
+  - name: grafana-test
+    type: postgres
+    # Template postgres://user@host:password@DBserver/databaseName?paramName=paramValue
+    connectionString: "postgres://user@foo-postgres:password@foo-postgres.postgres.database.azure.com/dbname?sslmode=verify-full"
 ```
 
 ### Flags
@@ -123,6 +118,6 @@ Metrics are exposed in the Prometheus format, at the standard `/metrics` endpoin
 Name | Description | Type | Labels
 -----|-------------|------|-------
 `updog_http_request_duration_seconds` | Inbound request latency. | Histogram | `path`
-`updog_dependency_duration_seconds` | Latency of the outbound dependency check. | Histogram | `dependency`
-`updog_dependency_checks_total` | Count of total health checks per dependency. | Counter | `dependency`
-`updog_dependency_check_failures_total` | Count of total health check failures per dependency. | Counter | `dependency`
+`updog_dependency_duration_seconds` | Latency of the outbound dependency check. | Histogram | `dependency`, `dependency_type`
+`updog_dependency_checks_total` | Count of total health checks per dependency. | Counter | `dependency`, `dependency_type`
+`updog_dependency_check_failures_total` | Count of total health check failures per dependency. | Counter | `dependency`, `dependency_type`

@@ -16,7 +16,7 @@ clean:
 		rm -rf bin
 		rm -rf updog-*
 run:
-		$(GORUN) $(GOFLAGS) updog.go
+		$(GORUN) $(GOFLAGS) ./...
 deps:
 		$(GOGET) -d -v ./...
 build-all: deps
