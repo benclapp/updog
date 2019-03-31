@@ -48,12 +48,12 @@ Checks of dependencies are executed in parallel, to ensure one slow dependency d
         ],
         "sql": [
             {
-                "name": "grafana-test",
+                "name": "Postgres Database",
                 "success": true,
                 "duration": 1.1117e-05
             },
             {
-                "name": "qa",
+                "name": "Microsoft SQL Database",
                 "success": true,
                 "duration": 0.342005575
             }
@@ -87,7 +87,7 @@ dependencies:
     type: mssql
     # Template sqlserver://username:password@db-server:port?paramName=paramValue
     connectionString: "sqlserver://username:password@foo.database.windows.net:1433?database=dbname"
-  - name: grafana-test
+  - name: Posrgres Database
     type: postgres
     # Template postgres://user@host:password@DBserver/databaseName?paramName=paramValue
     connectionString: "postgres://user@foo-postgres:password@foo-postgres.postgres.database.azure.com/dbname?sslmode=verify-full"
