@@ -11,3 +11,13 @@ dependencies:
     address: foo.redis.svc.cluster.local:6380
     password: SecretPassword
     ssl: true
+  sql:
+  - name: Microsoft SQL Database
+    type: mssql
+    # Template sqlserver://username:password@db-server:port?paramName=paramValue
+    connectionString: sqlserver://username:password@foo.database.windows.net:1433?database=dbname
+  - name: grafana-test
+    type: postgres
+    # Template postgres://user@host:password@DBserver/databaseName?paramName=paramValue
+    connectionString: postgres://user@foo-postgres:password@foo-postgres.postgres.database.azure.com/dbname?sslmode=verify-full
+
