@@ -1,3 +1,8 @@
+## 0.3.0
+
+- [FEATURE] Add `dependency_type` label to dependency metrics
+- [FEATURE] Add support for SQL checks. Postgres and MSSQL 
+
 ## 0.2.0
 
 - [CHANGE] Refactor config file and `/health` for nicer handling of multiple dependency types

@@ -79,6 +79,7 @@ func init() {
 func main() {
 	http.Handle("/metrics", promhttp.Handler())
 	http.HandleFunc("/ping", handlePing)
+	http.HandleFunc("/updog", handleHealth)
 	http.HandleFunc("/health", handleHealth)
 
 	log.Fatal(http.ListenAndServe(addr, nil))
@@ -140,7 +141,7 @@ func handleHealth(w http.ResponseWriter, r *http.Request) {
 	response, _ := json.MarshalIndent(&results, "", "    ")
 	fmt.Fprintf(w, string(response))
 
-	httpDurationsHistogram.WithLabelValues("/health").Observe(time.Since(start).Seconds())
+	httpDurationsHistogram.WithLabelValues(r.RequestURI).Observe(time.Since(start).Seconds())
 }
 
 type resultResponse struct {
