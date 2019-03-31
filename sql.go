@@ -18,13 +18,14 @@ func initSQL() {
 			log.Fatal("Opening db connection failed:", err.Error())
 		}
 
-		sqlCli := sqlClient{
-			Name: db.Name,
-			Db:   conn,
-			Type: db.Type,
-		}
-
-		sqlClients = append(sqlClients, sqlCli)
+		sqlClients = append(
+			sqlClients,
+			sqlClient{
+				Name: db.Name,
+				Db:   conn,
+				Type: db.Type,
+			},
+		)
 
 		logger.Log("dependency_type", "sql", "dependency_name", string(db.Name), "db_type", db.Type)
 
