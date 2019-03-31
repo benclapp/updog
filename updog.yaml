@@ -16,7 +16,7 @@ dependencies:
     type: mssql
     # Template sqlserver://username:password@db-server:port?paramName=paramValue
     connectionString: sqlserver://username:password@foo.database.windows.net:1433?database=dbname
-  - name: grafana-test
+  - name: PostgresSQL
     type: postgres
     # Template postgres://user@host:password@DBserver/databaseName?paramName=paramValue
     connectionString: postgres://user@foo-postgres:password@foo-postgres.postgres.database.azure.com/dbname?sslmode=verify-full
