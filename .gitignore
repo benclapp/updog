@@ -13,3 +13,6 @@
 
 # Build output directory
 bin
+
+# Dev config files
+*.dev.yaml
