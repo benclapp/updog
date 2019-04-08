@@ -7,17 +7,17 @@ dependencies:
   - name: Prometheus
     http_endpoint: http://demo.robustperception.io:9090/-/healthy
   redis:
-  - name: foo
-    address: foo.redis.svc.cluster.local:6380
-    password: SecretPassword
-    ssl: true
+  # - name: foo
+  #   address: foo.redis.svc.cluster.local:6380
+  #   password: SecretPassword
+  #   ssl: true
   sql:
-  - name: Microsoft SQL Database
-    type: mssql
-    # Template sqlserver://username:password@db-server:port?paramName=paramValue
-    connectionString: sqlserver://username:password@foo.database.windows.net:1433?database=dbname
-  - name: PostgresSQL
-    type: postgres
-    # Template postgres://user@host:password@DBserver/databaseName?paramName=paramValue
-    connectionString: postgres://user@foo-postgres:password@foo-postgres.postgres.database.azure.com/dbname?sslmode=verify-full
-
+  # - name: Microsoft SQL Database
+  #   type: mssql
+  #   connectionString: sqlserver://username:password@db-server:port?paramName=paramValue
+  # - name: PostgresSQL
+  #   type: postgres
+  #   connectionString: postgres://user@host:password@DBserver/databaseName?paramName=paramValue
+  rabbitmq:
+  # - name: Rabbit
+  #   dsn: amqp://user:password@server/vhost

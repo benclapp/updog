@@ -3,7 +3,13 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/benclapp/updog)](https://goreportcard.com/report/github.com/benclapp/updog)
 [![Docker Pulls](https://img.shields.io/docker/pulls/benclapp/updog.svg?maxAge=604800)](https://hub.docker.com/r/benclapp/updog)
 
-Updog is a health check aggregator for scenarios where you have multiple micro services running in a group. For example you may have many data centres running the same services. Your geo-steered loadbalancer could hit updog's `/health` or `/updog` endpoint for the status of each data centre.
+Updog is a health check aggregator for scenarios where you have multiple micro services running in a group. For example you may have many data centres running the same services. Your geo-steered loadbalancer could hit updog's `/health` or `/updog` endpoint for the status of each data centre. Updog currently supports health checks against the following dependencies:
+
+- HTTP
+- Redis
+- MSSQL
+- PostgreSQL
+- RabbitMQ
 
 Checks of dependencies are executed in parallel, to ensure one slow dependency doesn't risk causing an upstream timeout. The status of each dependency check is returned for adhoc debugging. Any response between `200 ≤ x ≤ 299` will succeed. `/health` and `/updog` return a 502 if any dependencies fail. Sample response:
 
@@ -57,6 +63,13 @@ Checks of dependencies are executed in parallel, to ensure one slow dependency d
                 "success": true,
                 "duration": 0.342005575
             }
+        ],
+        "rabbitMQ": [
+            {
+                "name": "RabbitMQ",
+                "success": true,
+                "duration": 3.023675
+            }
         ]
     }
 }
@@ -91,6 +104,9 @@ dependencies:
     type: postgres
     # Template postgres://user@host:password@DBserver/databaseName?paramName=paramValue
     connectionString: "postgres://user@foo-postgres:password@foo-postgres.postgres.database.azure.com/dbname?sslmode=verify-full"
+  rabbitmq:
+  - name: Rabbit
+    dsn: amqp://user:password@server/vhost
 ```
 
 ### Flags
