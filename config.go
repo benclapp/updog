@@ -76,7 +76,7 @@ type conf struct {
 		} `yaml:"sql"`
 		RabbitMQ []struct {
 			Name string `yaml:"name"`
-			DSN  string `yaml:"url"`
+			DSN  string `yaml:"dsn"`
 		}
 	} `yaml:"dependencies"`
 }

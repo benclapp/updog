@@ -1,99 +1,122 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"time"
 
 	"github.com/streadway/amqp"
 )
 
-var rabbitClients = rabbitClientsList{}
+// var rabbitClients = rabbitClientsList{}
+var hostname = ""
 
 func initRabbit() {
-	for _, rabbit := range config.Dependencies.RabbitMQ {
-		key, err := os.Hostname()
-		if err != nil {
-			logger.Log("msg", "failure getting hostname", "error", err)
-		}
+	hn, err := os.Hostname()
+	if err != nil {
+		logger.Log("msg", "failure getting hostname", "error", err)
+	}
+	hostname = hn
 
-		conn, err := amqp.Dial(rabbit.DSN)
-		if err != nil {
-			logRabbitErr("Failed on dial", err)
-		}
+	for _, bunny := range config.Dependencies.RabbitMQ {
+		logger.Log("dependency_type", "sql", "dependency_name", string(bunny.Name), "db_type", "RabbitMQ")
 
-		defer func() {
-			if err := conn.Close(); err != nil {
-				logRabbitErr("RabbitMQ health check failed to close connection", err)
-			}
-			logger.Log("dependency", "RabbitMQ", "msg", "Close rabbitmq connection")
-		}()
-
-		channel, err := conn.Channel()
-		if err != nil {
-			logRabbitErr("Failed getting channel", err)
-		}
-
-		defer func() {
-			if err := channel.Close(); err != nil {
-				logRabbitErr("Failed closing channel", err)
-			}
-			logger.Log("dependency", "RabbitMQ", "msg", "Closing Channel")
-		}()
-
-		if err := channel.ExchangeDeclare("UpdogExchange", "topic", true, false, false, false, nil); err != nil {
-			logRabbitErr("Failed declaring exchange", err)
-		}
-
-		if _, err := channel.QueueDeclare("UpdogQueue", false, false, false, false, nil); err != nil {
-			logRabbitErr("Failed declaring queue", err)
-		}
-
-		if err := channel.QueueBind("UpdogQueue", key, "UpdogExchange", false, nil); err != nil {
-			logRabbitErr("Failed during binding", err)
-		}
-
-		rabbitClients = append(
-			rabbitClients,
-			rabbitClient{
-				Name:    rabbit.Name,
-				Channel: channel,
-				Key:     key,
-			},
-		)
+		healthCheckDependencyDuration.WithLabelValues(bunny.Name, "RabbitMQ").Observe(0)
+		healthChecksTotal.WithLabelValues(bunny.Name, "RabbitMQ").Add(0)
+		healthChecksFailuresTotal.WithLabelValues(bunny.Name, "RabbitMQ").Add(0)
 	}
 }
 
-func checkRabbit(bunny rabbitClient) {
-	logger.Log("dependency", "RabbitMQ", "msg", "Starting to check dependency")
+func checkRabbit(dsn, name string, ch chan<- rabbitResult) {
 	start := time.Now()
+	err := check(dsn, name)
+	elapsed := time.Since(start).Seconds()
 
-	messages, err := bunny.Channel.Consume("UpdogQueue", "", true, false, false, false, nil)
+	healthCheckDependencyDuration.WithLabelValues(name, "RabbitMQ").Observe(elapsed)
+	healthChecksTotal.WithLabelValues(name, "RabbitMQ").Inc()
+
+	if err != nil {
+		logger.Log("msg", "Error while checking dependency", "dependency", name, "err", err)
+		healthChecksFailuresTotal.WithLabelValues(name, "RabbitMQ").Inc()
+		ch <- rabbitResult{Name: name, Success: false, Duration: elapsed, Err: err}
+	} else {
+		ch <- rabbitResult{Name: name, Success: true, Duration: elapsed}
+	}
+}
+
+func check(dsn, name string) error {
+	conn, err := amqp.Dial(dsn)
+	if err != nil {
+		logRabbitErr("Failed on dial", err)
+		return err
+	}
+
+	defer func() {
+		if err := conn.Close(); err != nil {
+			logRabbitErr("RabbitMQ health check failed to close connection", err)
+		}
+		logger.Log("dependency", "RabbitMQ", "msg", "Close rabbitmq connection")
+	}()
+
+	channel, err := conn.Channel()
+	if err != nil {
+		logRabbitErr("Failed getting channel", err)
+		return err
+	}
+
+	defer func() {
+		if err := channel.Close(); err != nil {
+			logRabbitErr("Failed closing channel", err)
+		}
+		logger.Log("dependency", "RabbitMQ", "msg", "Closing Channel")
+	}()
+
+	if err := channel.ExchangeDeclare("UpdogExchange", "topic", true, false, false, false, nil); err != nil {
+		logRabbitErr("Failed declaring exchange", err)
+		return err
+	}
+
+	if _, err := channel.QueueDeclare("UpdogQueue", false, false, false, false, nil); err != nil {
+		logRabbitErr("Failed declaring queue", err)
+		return err
+	}
+
+	if err := channel.QueueBind("UpdogQueue", hostname, "UpdogExchange", false, nil); err != nil {
+		logRabbitErr("Failed during binding", err)
+		return err
+	}
+
+	messages, err := channel.Consume("UpdogQueue", "", true, false, false, false, nil)
 	if err != nil {
 		logRabbitErr("Failed while consuming", err)
+		return err
 	}
 
 	fin := make(chan struct{})
 
 	go func() {
 		<-messages
-		logger.Log("dependency", "RabbitMQ", "time", time.Since(start).Seconds(), "msg", "message received")
+		logger.Log("dependency", "RabbitMQ", "msg", "message received")
 		close(fin)
 		for range messages {
 		}
 	}()
 
 	msg := amqp.Publishing{Body: []byte(time.Now().Format(time.RFC3339Nano))}
-	if err := bunny.Channel.Publish("UpdogExchange", bunny.Key, false, false, msg); err != nil {
+	if err := channel.Publish("UpdogExchange", hostname, false, false, msg); err != nil {
 		logRabbitErr("Fail while publishing", err)
+		return err
 	}
 
 	for {
+		logger.Log("msg", "Looping for messages?")
 		select {
 		case <-time.After(depTimeout):
 			logger.Log("dependency", "RabbitMQ", "msg", "Timed out waiting for message")
-			return
+			return fmt.Errorf("Timed out while waiting for message")
 		case <-fin:
-			return
+			logger.Log("dependency", "RabbitMQ", "msg", "Received message")
+			return nil
 		}
 	}
 }

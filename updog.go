@@ -100,7 +100,7 @@ func handleHealth(w http.ResponseWriter, r *http.Request) {
 	httpCh := make(chan HTTPResult)
 	redisCh := make(chan RedisResult)
 	sqlCh := make(chan sqlResult)
-	// rabbitCh := make(chan rabbitResult)
+	rabbitCh := make(chan rabbitResult)
 
 	results := resultResponse{}
 	pass := true
@@ -115,8 +115,8 @@ func handleHealth(w http.ResponseWriter, r *http.Request) {
 	for _, sqlCli := range sqlClients {
 		go checkSQL(sqlCli.Name, sqlCli.Type, sqlCli.Db, sqlCh)
 	}
-	for _, rabbit := range rabbitClients {
-		go checkRabbit(rabbit)
+	for _, rabbit := range config.Dependencies.RabbitMQ {
+		go checkRabbit(rabbit.DSN, rabbit.Name, rabbitCh)
 	}
 
 	//Wait for health checks to return
@@ -141,17 +141,17 @@ func handleHealth(w http.ResponseWriter, r *http.Request) {
 			pass = false
 		}
 	}
-	// for range config.Dependencies.RabbitMQ {
-	// 	res := <-rabbitCh
-	// 	results.Dependencies.RabbitResult = append(results.Dependencies.RabbitResult, res)
-	// 	if res.Success == false {
-	// 		pass = false
-	// 	}
-	// }
+	for range config.Dependencies.RabbitMQ {
+		res := <-rabbitCh
+		results.Dependencies.RabbitResult = append(results.Dependencies.RabbitResult, res)
+		if res.Success == false {
+			pass = false
+		}
+	}
 
-	// Return 502 if any dependencies failed
+	// Return 503 if any dependencies failed
 	if pass == false {
-		w.WriteHeader(http.StatusBadGateway)
+		w.WriteHeader(http.StatusServiceUnavailable)
 	}
 
 	response, _ := json.MarshalIndent(&results, "", "    ")
