@@ -16,10 +16,11 @@ func initRedis() {
 				name: red.Name,
 				client: redis.NewClient(
 					&redis.Options{
-						Addr:      red.Address,
-						Password:  red.Password,
-						DB:        0,
-						TLSConfig: &tls.Config{},
+						Addr:        red.Address,
+						Password:    red.Password,
+						DB:          0,
+						ReadTimeout: depTimeout,
+						TLSConfig:   &tls.Config{},
 					}),
 			}
 			redisClients = append(redisClients, redCli)
@@ -28,9 +29,10 @@ func initRedis() {
 				name: red.Name,
 				client: redis.NewClient(
 					&redis.Options{
-						Addr:     red.Address,
-						Password: red.Password,
-						DB:       0,
+						Addr:        red.Address,
+						Password:    red.Password,
+						DB:          0,
+						ReadTimeout: depTimeout,
 					}),
 			}
 			redisClients = append(redisClients, redCli)
