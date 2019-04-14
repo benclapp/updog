@@ -96,7 +96,6 @@ func check(dsn, name string) error {
 
 	go func() {
 		<-messages
-		logger.Log("dependency", "RabbitMQ", "msg", "message received")
 		close(fin)
 		for range messages {
 		}
@@ -109,7 +108,6 @@ func check(dsn, name string) error {
 	}
 
 	for {
-		logger.Log("msg", "Looping for messages?")
 		select {
 		case <-time.After(depTimeout):
 			logger.Log("dependency", "RabbitMQ", "msg", "Timed out waiting for message")
