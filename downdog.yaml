@@ -1,8 +1,0 @@
-dependencies:
-  http:
-  - name: Google
-    http_endpoint: https://google.com
-  - name: GitHub
-    http_endpoint: https://github.com
-  - name: Failure Dependency
-    http_endpoint: http://demo.robustperception.io:9090/-/healthy/foo

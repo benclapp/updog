@@ -1,3 +1,8 @@
+## 0.4.0
+
+- [CHANGE] Use 503 response for failures rather than 502
+- [FEATURE] Add `/updog` endpoint
+
 ## 0.3.0
 
 - [FEATURE] Add `dependency_type` label to dependency metrics
