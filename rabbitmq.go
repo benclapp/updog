@@ -113,7 +113,6 @@ func check(dsn, name string) error {
 			logger.Log("dependency", "RabbitMQ", "msg", "Timed out waiting for message")
 			return fmt.Errorf("Timed out while waiting for message")
 		case <-fin:
-			logger.Log("dependency", "RabbitMQ", "msg", "Received message")
 			return nil
 		}
 	}
