@@ -19,7 +19,7 @@ func initRabbit() {
 	hostname = hn
 
 	for _, bunny := range config.Dependencies.RabbitMQ {
-		logger.Log("dependency_type", "sql", "dependency_name", string(bunny.Name), "db_type", "RabbitMQ")
+		logger.Log("dependency_type", "rabbitmq", "dependency_name", string(bunny.Name), "db_type", "RabbitMQ")
 
 		healthCheckDependencyDuration.WithLabelValues(bunny.Name, "RabbitMQ").Observe(0)
 		healthChecksTotal.WithLabelValues(bunny.Name, "RabbitMQ").Add(0)
