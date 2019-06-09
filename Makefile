@@ -33,7 +33,7 @@ build-all: deps
 		done
 
 docker:
-		docker build -t benclapp/updog:$(VERSION) -t benclapp/updog:$(VERSION_MINOR) -t benclapp/updog:latest .
+		docker build --pull -t benclapp/updog:$(VERSION) -t benclapp/updog:$(VERSION_MINOR) -t benclapp/updog:latest .
 		docker push benclapp/updog:$(VERSION)
 		docker push benclapp/updog:$(VERSION_MINOR)
 		docker push benclapp/updog:latest
