@@ -1,3 +1,7 @@
+## 0.4.1
+
+- [FIX] Fix typo in RabbitMQ init log
+
 ## 0.4.0
 
 - [CHANGE] Use 503 response for failures rather than 502
