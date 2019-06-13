@@ -18,6 +18,3 @@ dependencies:
   # - name: PostgresSQL
   #   type: postgres
   #   connectionString: postgres://user@host:password@DBserver/databaseName?paramName=paramValue
-  rabbitmq:
-  # - name: Rabbit
-  #   dsn: amqp://user:password@server/vhost
