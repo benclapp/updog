@@ -1,5 +1,9 @@
 ## Next Release
 
+- 
+
+## 0.5.0
+
 - [CHANGE] Remove RabbitMQ dependency checks
 
 ## 0.4.1
