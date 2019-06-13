@@ -1,3 +1,7 @@
+## Next Release
+
+- [CHANGE] Remove RabbitMQ dependency checks
+
 ## 0.4.1
 
 - [FIX] Fix typo in RabbitMQ init log

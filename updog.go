@@ -75,7 +75,6 @@ func init() {
 	initHTTP()
 	initRedis()
 	initSQL()
-	initRabbit()
 	logger.Log("msg", "Finished initilisation")
 }
 
@@ -100,7 +99,6 @@ func handleHealth(w http.ResponseWriter, r *http.Request) {
 	httpCh := make(chan HTTPResult)
 	redisCh := make(chan RedisResult)
 	sqlCh := make(chan sqlResult)
-	rabbitCh := make(chan rabbitResult)
 
 	results := resultResponse{}
 	pass := true
@@ -114,9 +112,6 @@ func handleHealth(w http.ResponseWriter, r *http.Request) {
 	}
 	for _, sqlCli := range sqlClients {
 		go checkSQL(sqlCli.Name, sqlCli.Type, sqlCli.Db, sqlCh)
-	}
-	for _, rabbit := range config.Dependencies.RabbitMQ {
-		go checkRabbit(rabbit.DSN, rabbit.Name, rabbitCh)
 	}
 
 	//Wait for health checks to return
@@ -141,13 +136,6 @@ func handleHealth(w http.ResponseWriter, r *http.Request) {
 			pass = false
 		}
 	}
-	for range config.Dependencies.RabbitMQ {
-		res := <-rabbitCh
-		results.Dependencies.RabbitResult = append(results.Dependencies.RabbitResult, res)
-		if res.Success == false {
-			pass = false
-		}
-	}
 
 	// Return 503 if any dependencies failed
 	if pass == false {
@@ -162,9 +150,8 @@ func handleHealth(w http.ResponseWriter, r *http.Request) {
 
 type resultResponse struct {
 	Dependencies struct {
-		HTTPResult   []HTTPResult   `json:"http"`
-		RedisResult  []RedisResult  `json:"redis"`
-		SqlResult    []sqlResult    `json:"sql"`
-		RabbitResult []rabbitResult `json:"rabbitMQ"`
+		HTTPResult  []HTTPResult  `json:"http"`
+		RedisResult []RedisResult `json:"redis"`
+		SqlResult   []sqlResult   `json:"sql"`
 	} `json:"results"`
 }
