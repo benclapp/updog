@@ -15,7 +15,7 @@ var logger = log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr))
 
 var (
 	version       string
-	configPath    = kingpin.Flag("config.path", "Path of configuration file").Short('c').String()
+	configPath    = kingpin.Flag("config.path", "Path of configuration file").Short('c').Default("updog.yaml").String()
 	listenAddress = kingpin.Flag("listen.address", "Address to listen on for HTTP requests").Default(":1111").String()
 	timeout       = kingpin.Flag("timeout", "Timeout for dependency checks").Short('t').Default("5s").Duration()
 )

@@ -15,7 +15,7 @@ type Checker interface {
 }
 
 type Result struct {
-	Name     string  `json:"name"`
+	Name     string  `json:"-"`
 	Typez    string  `json:"type"`
 	Success  bool    `json:"success"`
 	Duration float64 `json:"duration"`

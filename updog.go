@@ -112,7 +112,7 @@ func handlePing(w http.ResponseWriter, r *http.Request) {
 func handleHealth(w http.ResponseWriter, r *http.Request) {
 	level.Debug(logger).Log("msg", "handleHealth")
 	start := time.Now()
-	defer httpDurationsHistogram.WithLabelValues(r.RequestURI).Observe(time.Since(start).Seconds())
+	defer func() { httpDurationsHistogram.WithLabelValues(r.RequestURI).Observe(time.Since(start).Seconds()) }()
 
 	//loop registered checkers
 	resultChan := make(chan checks.Result)
