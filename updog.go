@@ -3,22 +3,27 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
+	"sync"
 	"time"
 
 	_ "net/http/pprof"
 
-	logg "github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	kingpin "gopkg.in/alecthomas/kingpin.v2"
+
+	"github.com/benclapp/updog/checks"
+	"github.com/benclapp/updog/config"
 )
 
-var version string
+const SPACE = " "
 
-var logger logg.Logger
+var logger log.Logger = level.NewFilter(log.NewLogfmtLogger(os.Stdout), level.AllowInfo())
+var cfg config.Configurable
+var checkersRegistry []checks.Checker
 
 var (
 	httpDurationsHistogram = prometheus.NewHistogramVec(
@@ -55,14 +60,7 @@ var (
 )
 
 func init() {
-	logger = logg.NewLogfmtLogger(logg.NewSyncWriter(os.Stderr))
-	logger = logg.With(logger, "ts", logg.DefaultTimestampUTC, "caller", logg.DefaultCaller)
-
-	kingpin.UsageTemplate(kingpin.CompactUsageTemplate).Version(version)
-	kingpin.CommandLine.Help = "Service to aggregate health checks. Returns 502 if any fail."
-	kingpin.Parse()
-
-	configure()
+	cfg = config.NewConfig()
 
 	prometheus.MustRegister(
 		httpDurationsHistogram,
@@ -71,11 +69,29 @@ func init() {
 		healthChecksFailuresTotal,
 	)
 
-	logger.Log("msg", "Congigured Dependencies...")
-	initHTTP()
-	initRedis()
-	initSQL()
-	logger.Log("msg", "Finished initilisation")
+	//Create Checkers
+	level.Info(logger).Log("msg", "Configured Dependencies...")
+
+	for _, dep := range cfg.GetDependencies().HTTP {
+		checkersRegistry = append(checkersRegistry, checks.NewHttpChecker(dep.Name, dep.HTTPEndpoint, cfg.GetTimeout()))
+		initMetrics(dep.Name, checks.HTTP_TYPE)
+	}
+	for _, dep := range cfg.GetDependencies().Redis {
+		checkersRegistry = append(checkersRegistry, checks.NewRedisChecker(dep.Name, dep.Address, dep.Password, cfg.GetTimeout(), dep.Ssl))
+		initMetrics(dep.Name, checks.REDIS_TYPE)
+	}
+	for _, dep := range cfg.GetDependencies().SQL {
+		checkersRegistry = append(checkersRegistry, checks.NewSqlChecker(dep.Name, dep.Type, dep.ConnectionString))
+		initMetrics(dep.Name, checks.SQL_TYPE)
+	}
+
+	level.Info(logger).Log("msg", "Finished initialisation")
+}
+
+func initMetrics(name string, typez string) {
+	healthCheckDependencyDuration.WithLabelValues(name, typez).Observe(0)
+	healthChecksTotal.WithLabelValues(name, typez).Add(0)
+	healthChecksFailuresTotal.WithLabelValues(name, typez).Add(0)
 }
 
 func main() {
@@ -84,7 +100,7 @@ func main() {
 	http.HandleFunc("/updog", handleHealth)
 	http.HandleFunc("/health", handleHealth)
 
-	log.Fatal(http.ListenAndServe(addr, nil))
+	level.Error(logger).Log("err", http.ListenAndServe(cfg.GetAddress(), nil))
 }
 
 func handlePing(w http.ResponseWriter, r *http.Request) {
@@ -94,64 +110,53 @@ func handlePing(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleHealth(w http.ResponseWriter, r *http.Request) {
+	level.Debug(logger).Log("msg", "handleHealth")
 	start := time.Now()
+	defer func() { httpDurationsHistogram.WithLabelValues(r.RequestURI).Observe(time.Since(start).Seconds()) }()
 
-	httpCh := make(chan HTTPResult)
-	redisCh := make(chan RedisResult)
-	sqlCh := make(chan sqlResult)
-
-	results := resultResponse{}
-	pass := true
+	//loop registered checkers
+	resultChan := make(chan checks.Result)
+	var wg sync.WaitGroup
 
 	// Start health checks concurrently
-	for _, dep := range config.Dependencies.HTTP {
-		go checkHTTP(dep.HTTPEndpoint, dep.Name, httpCh)
-	}
-	for _, redCli := range redisClients {
-		go checkRedis(redCli, redisCh)
-	}
-	for _, sqlCli := range sqlClients {
-		go checkSQL(sqlCli.Name, sqlCli.Type, sqlCli.Db, sqlCh)
-	}
-
-	//Wait for health checks to return
-	for range config.Dependencies.HTTP {
-		res := <-httpCh
-		results.Dependencies.HTTPResult = append(results.Dependencies.HTTPResult, res)
-		if res.Success == false {
-			pass = false
-		}
-	}
-	for range redisClients {
-		res := <-redisCh
-		results.Dependencies.RedisResult = append(results.Dependencies.RedisResult, res)
-		if res.Success == false {
-			pass = false
-		}
-	}
-	for range sqlClients {
-		res := <-sqlCh
-		results.Dependencies.SqlResult = append(results.Dependencies.SqlResult, res)
-		if res.Success == false {
-			pass = false
-		}
+	//FIXME https://stackoverflow.com/questions/46010836/using-goroutines-to-process-values-and-gather-results-into-a-slice
+	for _, checker := range checkersRegistry {
+		wg.Add(1)
+		// Process each item with a goroutine and send output to resultChan
+		go func(checker checks.Checker) {
+			defer wg.Done()
+			resultChan <- checker.Check()
+		}(checker)
 	}
 
-	// Return 503 if any dependencies failed
+	//Use countdown latch to close after checks return
+	go func() {
+		wg.Wait()
+		close(resultChan)
+	}()
+
+	results := make(map[string]checks.Result)
+	pass := true
+	for r := range resultChan {
+		level.Debug(logger).Log("msg", "Dependency returned", r.Name, r.Success)
+
+		pass = pass && r.Success
+		results[r.Name] = r
+
+		healthCheckDependencyDuration.WithLabelValues(r.Name, r.Typez).Observe(r.Duration)
+		healthChecksTotal.WithLabelValues(r.Name, r.Typez).Inc()
+
+		if r.Err != nil {
+			healthChecksFailuresTotal.WithLabelValues(r.Name, r.Typez).Inc()
+		}
+	}
+
+	// Return 503 if any of the dependencies failed
 	if pass == false {
+		level.Warn(logger).Log("msg", "StatusServiceUnavailable")
 		w.WriteHeader(http.StatusServiceUnavailable)
 	}
 
-	response, _ := json.MarshalIndent(&results, "", "    ")
+	response, _ := json.MarshalIndent(&results, "", SPACE)
 	fmt.Fprintf(w, string(response))
-
-	httpDurationsHistogram.WithLabelValues(r.RequestURI).Observe(time.Since(start).Seconds())
-}
-
-type resultResponse struct {
-	Dependencies struct {
-		HTTPResult  []HTTPResult  `json:"http"`
-		RedisResult []RedisResult `json:"redis"`
-		SqlResult   []sqlResult   `json:"sql"`
-	} `json:"results"`
 }

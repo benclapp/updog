@@ -14,56 +14,24 @@ Checks of dependencies are executed in parallel, to ensure one slow dependency d
 
 ```json
 {
-    "results": {
-        "http": [
-            {
-                "name": "Error",
-                "success": false,
-                "duration": 0.294109529,
-                "error": {
-                    "err": "some error"
-                }
-            },
-            {
-                "name": "Not 2..",
-                "success": false,
-                "duration": 0.562796634,
-                "httpStatus": "404 Not Found"
-            },
-            {
-                "name": "Google",
-                "success": true,
-                "duration": 0.667266497
-            }
-        ],
-        "redis": [
-            {
-                "name": "Error",
-                "success": false,
-                "duration": 0.016504383,
-                "error": {
-                    "err": "some error"
-                }
-            },
-            {
-                "name": "Redis",
-                "success": true,
-                "duration": 0.311321392
-            }
-        ],
-        "sql": [
-            {
-                "name": "Postgres Database",
-                "success": true,
-                "duration": 1.1117e-05
-            },
-            {
-                "name": "Microsoft SQL Database",
-                "success": true,
-                "duration": 0.342005575
-            }
-        ]
-    }
+ "GitHub": {
+  "type": "http",
+  "success": true,
+  "duration": 0.4550456,
+  "Reason": null
+ },
+ "Google": {
+  "type": "http",
+  "success": true,
+  "duration": 0.6515392,
+  "Reason": null
+ },
+ "Prometheus": {
+  "type": "http",
+  "success": true,
+  "duration": 0.6485875,
+  "Reason": null
+ }
 }
 ```
 
