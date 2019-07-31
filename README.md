@@ -15,21 +15,18 @@ Checks of dependencies are executed in parallel, to ensure one slow dependency d
 ```json
 {
  "GitHub": {
-  "name": "GitHub",
   "type": "http",
   "success": true,
   "duration": 0.4550456,
   "Reason": null
  },
  "Google": {
-  "name": "Google",
   "type": "http",
   "success": true,
   "duration": 0.6515392,
   "Reason": null
  },
  "Prometheus": {
-  "name": "Prometheus",
   "type": "http",
   "success": true,
   "duration": 0.6485875,
