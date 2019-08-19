@@ -8,18 +8,26 @@ GORUN=$(GOCMD) run
 GOCLEAN=$(GOCMD) clean
 GOGET=$(GOCMD) get
 
-all: build-all docker
-build: deps
+all: help
+
+
+release: ## Build binaries for Linux/Darwin/Windows, build and pushes docker images
+	build-all 
+	docker
+	docker-push
+
+build: ## build updog
 		$(GOBUILD) $(GOFLAGS) -v
-clean:
+
+clean: ## go clean, and removes bin directory and temp files
 		$(GOCLEAN)
 		rm -rf bin
 		rm -rf updog-*
-run:
-		$(GORUN) $(GOFLAGS) ./...
-deps:
-		$(GOGET) -d -v ./...
-build-all: deps
+
+run: ## Run's updog with some build flags
+		$(GORUN) $(GOFLAGS) updog.go
+
+build-all: ## Build updog for Linux/Darwin/Windows, compresses to .tar.gz
 		mkdir -p bin
 		for OS in linux darwin windows ; do \
 			env GOOS=$$OS GOARCH=amd64 $(GOBUILD) $(GOFLAGS) ; \
@@ -32,8 +40,13 @@ build-all: deps
 			rm -rf updog-$(VERSION)-$$OS-amd64 ; \
 		done
 
-docker:
+docker: ## Build docker image with 'x.y', 'x.y.z', and 'latest' tags
 		docker build --pull -t benclapp/updog:$(VERSION) -t benclapp/updog:$(VERSION_MINOR) -t benclapp/updog:latest .
+
+docker-push: ## Pushes previously build docker images. Only Ben can run this
 		docker push benclapp/updog:$(VERSION)
 		docker push benclapp/updog:$(VERSION_MINOR)
 		docker push benclapp/updog:latest
+
+help:
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
