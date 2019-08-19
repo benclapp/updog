@@ -2,6 +2,11 @@
 
 - 
 
+## 0.6.0
+
+- Refactor and add unit tests (Thanks [@gcristofol](https://github.com/gcristofol)!)
+- Tweak builds
+
 ## 0.5.0
 
 - [CHANGE] Remove RabbitMQ dependency checks
