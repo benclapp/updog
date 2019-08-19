@@ -21,6 +21,7 @@ import (
 
 const SPACE = " "
 
+var version string
 var logger log.Logger = level.NewFilter(log.NewLogfmtLogger(os.Stdout), level.AllowInfo())
 var cfg config.Configurable
 var checkersRegistry []checks.Checker
@@ -60,6 +61,7 @@ var (
 )
 
 func init() {
+	config.Version = version
 	cfg = config.NewConfig()
 
 	prometheus.MustRegister(

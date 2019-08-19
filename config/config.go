@@ -14,7 +14,7 @@ import (
 var logger = log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr))
 
 var (
-	version       string
+	Version       string
 	configPath    = kingpin.Flag("config.path", "Path of configuration file").Short('c').Default("updog.yaml").String()
 	listenAddress = kingpin.Flag("listen.address", "Address to listen on for HTTP requests").Default(":1111").String()
 	timeout       = kingpin.Flag("timeout", "Timeout for dependency checks").Short('t').Default("5s").Duration()
@@ -52,7 +52,7 @@ type Configuration struct {
 }
 
 func NewConfig() *Configuration {
-	kingpin.UsageTemplate(kingpin.CompactUsageTemplate).Version(version)
+	kingpin.UsageTemplate(kingpin.CompactUsageTemplate).Version(Version)
 	kingpin.CommandLine.Help = "Service to aggregate health checks. Returns 502 if any fail."
 	kingpin.Parse()
 
