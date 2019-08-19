@@ -11,10 +11,7 @@ GOGET=$(GOCMD) get
 all: help
 
 
-release: ## Build binaries for Linux/Darwin/Windows, build and pushes docker images
-	build-all 
-	docker
-	docker-push
+release: build-all docker docker-push ## Build binaries for Linux/Darwin/Windows, build and pushes docker images
 
 build: ## build updog
 		$(GOBUILD) $(GOFLAGS) -v
