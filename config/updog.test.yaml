@@ -1,0 +1,20 @@
+dependencies:
+  http:
+  - name: Google
+    http_endpoint: https://google.com
+  - name: GitHub
+    http_endpoint: https://github.com
+  - name: Prometheus
+    http_endpoint: http://demo.robustperception.io:9090/-/healthy
+  redis:
+   - name: foo
+     address: foo.redis.svc.cluster.local:6380
+     password: SecretPassword
+     ssl: true
+  sql:
+   - name: Microsoft SQL Database
+     type: mssql
+     connectionString: sqlserver://username:password@db-server:port?paramName=paramValue
+   - name: PostgresSQL
+     type: postgres
+     connectionString: postgres://user@host:password@DBserver/databaseName?paramName=paramValue

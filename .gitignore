@@ -16,3 +16,6 @@ bin
 
 # Dev config files
 *.dev.yaml
+
+updog
+updog.exe
